@@ -25,7 +25,20 @@ This project is an attempt to faithfully recreate the gameplay of the original *
 
 ## Screenshots
 
-Screenshots can be found in the [`exported_tiles/`](exported_tiles/) directory.
+<table>
+  <tr>
+    <td><img src="docs/title-00.png" alt="Title 00" width="400"></td>
+    <td><img src="docs/title-01.png" alt="Title 01" width="400"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/game-01.png" alt="Game 01" width="400"></td>
+    <td><img src="docs/game-02.png" alt="Game 02" width="400"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/game-03.png" alt="Game 03" width="400"></td>
+    <td></td>
+  </tr>
+</table>
 
 ## Build Requirements
 
