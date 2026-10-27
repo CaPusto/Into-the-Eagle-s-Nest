@@ -177,6 +177,18 @@ eaglenest-port/
 
 The rights to the original *Eagle's Nest* game belong to its respective authors. This port is provided for educational and research purposes only. Before publishing or distributing this project, make sure you have the rights to use the original assets.
 
+### Source Code
+The source code written for this port is made available under the **MIT License** (see the `LICENSE` file for details). You are free to use, modify, and distribute the code.
+
+### Audio Assets
+All music themes and sound effects included in this repository are original works created by the author of this port. All rights reserved / licensed under [Copyright © 2026 dudorov@gmail.com].
+
+### Graphics Assets
+The rights to the original *Into the Eagle's Nest* game, including all sprites, tiles, and visual artwork used in the `assets/` directory, belong to their respective original authors and publishers (Pandora Software / Mindscape). 
+
+These pre-converted graphics assets are included strictly for educational, research, and non-commercial preservation purposes. If you plan to distribute, publish, or commercially use this project, you must ensure you have the appropriate rights to these original assets or replace them entirely.
+
+
 ## Credits
 
 - Original *Eagle's Nest* developers for creating this great game
