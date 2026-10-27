@@ -32,14 +32,20 @@ jobs:
 
     # --- ENVIRONMENT SETUP ---
     
-    # Linux (Ubuntu) setup
+    # Linux (Ubuntu) setup with manual SDL3 installation from GitHub
     - name: Install Linux Dependencies
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake pkg-config gcc
-        # Try installing libsdl3-dev if available in the package manager
-        sudo apt-get install -y libsdl3-dev || true
+        sudo apt-get install -y cmake pkg-config gcc ninja-build libasound2-dev libpulse-dev
+        # Download and install official SDL3 release since it is missing in apt
+        wget https://github.com
+        tar -xzf SDL3-3.2.0.tar.gz
+        cd SDL3-3.2.0
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=ON -DSDL_STATIC=OFF
+        sudo cmake --build . --target install
+        sudo ldconfig
 
     # Windows (MSYS2/MinGW64) setup
     - name: Set up MSYS2 (Windows)
@@ -70,14 +76,14 @@ jobs:
         cmake .. -DCMAKE_BUILD_TYPE=Release
         make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
-   # Windows build using the repository batch script inside MSYS2 bash
+    # Windows build using the repository batch script inside MSYS2 bash
     - name: Build (Windows MINGW64)
       if: matrix.os == 'windows-latest'
       shell: msys2 {0}
       run: |
         ./build_windows_mingw.bat
 
-  # --- PACKAGING ---
+    # --- PACKAGING ---
 
     # Pack Linux/macOS binaries into .tar.gz
     - name: Archive Production Artifacts (Linux/macOS)
@@ -87,50 +93,10 @@ jobs:
         tar -czf ../../${{ matrix.artifact_name }}.tar.gz .
         cd ../..
 
-    # Pack Windows files (Searching inside the workspace for any 'dist' directory)
+    # Pack Windows files (Running strictly inside MSYS2 shell to ensure right paths)
     - name: Archive Production Artifacts (Windows)
       if: matrix.os == 'windows-latest'
-      shell: bash
+      shell: msys2 {0}
       run: |
-        # Automatically find where the 'dist' folder with eaglenest.exe is located
-        DIST_DIR=$(find . -type d -name "dist" | head -n 1)
-        echo "Found dist directory at: $DIST_DIR"
-        cd "$DIST_DIR"
-        7z a ../../${{ matrix.artifact_name }}.zip .
-        cd -
-
-    # Upload temporary artifacts for the upcoming release job
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.artifact_name }}
-        path: ${{ matrix.artifact_name }}.*
-        retention-days: 1
-
-  release:
-    name: Create GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    # Download everything compiled in the previous job
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts
-        merge-multiple: true
-
-    - name: Display structure of downloaded files
-      run: ls -R artifacts
-
-    # Automatically create the GitHub Release and attach compiled archives
-    - name: Create Release and Upload Assets
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-          artifacts/eaglenest-linux.tar.gz
-          artifacts/eaglenest-windows.zip
-          artifacts/eaglenest-macos.tar.gz
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        cd build/dist
+        tar -caf ../../eaglenest-windows.zip *
