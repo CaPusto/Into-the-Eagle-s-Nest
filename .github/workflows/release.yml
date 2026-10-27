@@ -1,0 +1,133 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on any tag push starting with 'v' (e.g., v1.0.0)
+
+permissions:
+  contents: write # Required to create a release and upload assets
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: eaglenest-linux
+            asset_path: build/dist
+          - os: windows-latest
+            artifact_name: eaglenest-windows
+            asset_path: build/dist
+          - os: macos-latest
+            artifact_name: eaglenest-macos
+            asset_path: build/dist
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # --- ENVIRONMENT SETUP ---
+    
+    # Linux (Ubuntu) setup
+    - name: Install Linux Dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake pkg-config gcc
+        # Try installing libsdl3-dev if available in the package manager
+        sudo apt-get install -y libsdl3-dev || true
+
+    # Windows (MSYS2/MinGW64) setup
+    - name: Set up MSYS2 (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-pkg-config
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-SDL3
+
+    # macOS setup
+    - name: Install macOS Dependencies
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install cmake pkg-config sdl3
+
+    # --- COMPILATION ---
+
+    # Standard CMake build for Linux and macOS
+    - name: Build (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+    # Windows build using the repository batch script inside MSYS2 bash
+    - name: Build (Windows MINGW64)
+      if: matrix.os == 'windows-latest'
+      shell: msys2 {0}
+      run: |
+        ./build_windows_mingw.bat
+
+    # --- PACKAGING ---
+
+    # Pack Linux/macOS binaries into .tar.gz
+    - name: Archive Production Artifacts (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        cd ${{ matrix.asset_path }}
+        tar -czf ../../${{ matrix.artifact_name }}.tar.gz .
+        cd ../..
+
+    # Pack Windows files (including copied DLLs) into .zip using 7z
+    - name: Archive Production Artifacts (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        cd ${{ matrix.asset_path }}
+        7z a ../../${{ matrix.artifact_name }}.zip .
+        cd ../..
+
+    # Upload temporary artifacts for the upcoming release job
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: ${{ matrix.artifact_name }}.*
+        retention-days: 1
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    # Download everything compiled in the previous job
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+        merge-multiple: true
+
+    - name: Display structure of downloaded files
+      run: ls -R artifacts
+
+    # Automatically create the GitHub Release and attach compiled archives
+    - name: Create Release and Upload Assets
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          artifacts/eaglenest-linux.tar.gz
+          artifacts/eaglenest-windows.zip
+          artifacts/eaglenest-macos.tar.gz
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
