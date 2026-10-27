@@ -9,6 +9,7 @@ A cross-platform port of the original Amiga game *Eagle's Nest* to C using [SDL3
 
 This project is an attempt to faithfully recreate the gameplay of the original *Eagle's Nest*. The port is written in pure C, uses SDL3 as its only external dependency, and includes a built-in ProTracker MOD decoder for music playback.
 
+![Title screen](docs/title.png)
 ## Features
 
 - **Faithful recreation** - Game logic closely matches the original, including mission selection, elevators, detonators, prisoner rescue, and more
