@@ -5,24 +5,6 @@
 
 A cross-platform port of the original Amiga game *Eagle's Nest* to C using [SDL3](https://www.libsdl.org/).
 
-## About
-
-This project is an attempt to faithfully recreate the gameplay of the original *Eagle's Nest*. The port is written in pure C, uses SDL3 as its only external dependency, and includes a built-in ProTracker MOD decoder for music playback.
-
-![Title screen](docs/title.png)
-## Features
-
-- **Faithful recreation** - Game logic closely matches the original, including mission selection, elevators, detonators, prisoner rescue, and more
-- **SDL3 only** - libopenmpt is no longer used; music is played by the built-in decoder in `src/audio/mod.c`
-- **Cross-platform** - Supports Linux, Windows, and macOS
-- **Input support** - Keyboard and gamepad
-- **High score system** - Save high scores with name entry
-- **Cheat codes** - Available via command-line arguments
-- **Two executables**:
-  - `eaglenest` - Main game
-  - `mapview` - Map inspector for viewing levels with coordinates in console
-- **Debugging** - Framebuffer screenshots can be saved via the `EAGLE_DUMP_DIR` environment variable
-
 ## Screenshots
 
 <table>
@@ -39,6 +21,24 @@ This project is an attempt to faithfully recreate the gameplay of the original *
     <td></td>
   </tr>
 </table>
+
+## About
+
+This project is an attempt to faithfully recreate the gameplay of the original *Eagle's Nest*. The port is written in pure C, uses SDL3 as its only external dependency, and includes a built-in ProTracker MOD decoder for music playback.
+
+
+## Features
+
+- **Faithful recreation** - Game logic closely matches the original, including mission selection, elevators, detonators, prisoner rescue, and more
+- **SDL3 only** - libopenmpt is no longer used; music is played by the built-in decoder in `src/audio/mod.c`
+- **Cross-platform** - Supports Linux, Windows, and macOS
+- **Input support** - Keyboard and gamepad
+- **High score system** - Save high scores with name entry
+- **Cheat codes** - Available via command-line arguments
+- **Two executables**:
+  - `eaglenest` - Main game
+  - `mapview` - Map inspector for viewing levels with coordinates in console
+- **Debugging** - Framebuffer screenshots can be saved via the `EAGLE_DUMP_DIR` environment variable
 
 ## Build Requirements
 
