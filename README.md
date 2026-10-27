@@ -189,6 +189,6 @@ These pre-converted graphics assets are included strictly for educational, resea
 
 ## Credits
 
-* **[hitchhikr](https://github.com/hitchhikr)** — Huge thanks and deepest gratitude for **[A complete disassembly of the Amiga version of the game "Into The Eagle's Nest"](https://github.com/hitchhikr/eaglenest)**. This project and historical preservation work made this port possible.
 * Original *Eagle's Nest* developers for creating this great game.
+* **[hitchhikr](https://github.com/hitchhikr)** — Huge thanks and deepest gratitude for **[A complete disassembly of the Amiga version of the game "Into The Eagle's Nest"](https://github.com/hitchhikr/eaglenest)**. This project and historical preservation work made this port possible.
 * The retro gaming community for ongoing research, passion, and documentation of the original version.
