@@ -1,3 +1,17 @@
+> [!CAUTION]
+>==============================================================================
+>LICENSE NOTICE
+>==============================================================================
+>The MIT License detailed below applies SOLELY to the source code of this 
+>project (contained within the 'src/' directory). 
+>
+>This license does NOT cover:
+>1. The original graphical assets (sprites, tiles) in the 'assets/' directory, 
+>   which belong to their respective original authors and publishers.
+>2. The custom audio assets (music and sound effects), which are original works 
+>   by the author of this port.
+>==============================================================================
+
 MIT License
 
 Copyright (c) 2026 Eugene
