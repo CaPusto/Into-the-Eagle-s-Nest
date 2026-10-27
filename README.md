@@ -1,7 +1,7 @@
 > [!CAUTION]
 > # COMING SOON
 
-# Eagle's Nest Port
+# Into the Eagle's Nest Port
 
 A cross-platform port of the original Amiga game *Eagle's Nest* to C using [SDL3](https://www.libsdl.org/).
 
