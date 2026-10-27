@@ -70,14 +70,14 @@ jobs:
         cmake .. -DCMAKE_BUILD_TYPE=Release
         make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
-    # Windows build using the repository batch script inside MSYS2 bash
+   # Windows build using the repository batch script inside MSYS2 bash
     - name: Build (Windows MINGW64)
       if: matrix.os == 'windows-latest'
       shell: msys2 {0}
       run: |
         ./build_windows_mingw.bat
 
-    # --- PACKAGING ---
+  # --- PACKAGING ---
 
     # Pack Linux/macOS binaries into .tar.gz
     - name: Archive Production Artifacts (Linux/macOS)
@@ -87,14 +87,17 @@ jobs:
         tar -czf ../../${{ matrix.artifact_name }}.tar.gz .
         cd ../..
 
-    # Pack Windows files (including copied DLLs) into .zip using 7z
+    # Pack Windows files (Searching inside the workspace for any 'dist' directory)
     - name: Archive Production Artifacts (Windows)
       if: matrix.os == 'windows-latest'
       shell: bash
       run: |
-        cd ${{ matrix.asset_path }}
+        # Automatically find where the 'dist' folder with eaglenest.exe is located
+        DIST_DIR=$(find . -type d -name "dist" | head -n 1)
+        echo "Found dist directory at: $DIST_DIR"
+        cd "$DIST_DIR"
         7z a ../../${{ matrix.artifact_name }}.zip .
-        cd ../..
+        cd -
 
     # Upload temporary artifacts for the upcoming release job
     - name: Upload Artifact
