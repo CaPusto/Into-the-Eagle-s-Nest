@@ -175,8 +175,6 @@ eaglenest-port/
 
 ## License
 
-The rights to the original *Eagle's Nest* game belong to its respective authors. This port is provided for educational and research purposes only. Before publishing or distributing this project, make sure you have the rights to use the original assets.
-
 ### Source Code
 The source code written for this port is made available under the **MIT License** (see the `LICENSE` file for details). You are free to use, modify, and distribute the code.
 
