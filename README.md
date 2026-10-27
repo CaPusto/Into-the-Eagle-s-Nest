@@ -30,7 +30,7 @@ This project is an attempt to faithfully recreate the gameplay of the original *
 ## Features
 
 - **Faithful recreation** - Game logic closely matches the original, including mission selection, elevators, detonators, prisoner rescue, and more
-- **SDL3 only** - libopenmpt is no longer used; music is played by the built-in decoder in `src/audio/mod.c`
+- **SDL3 only** - Music is played by the built-in decoder in `src/audio/mod.c`
 - **Cross-platform** - Supports Linux, Windows, and macOS
 - **Input support** - Keyboard and gamepad
 - **High score system** - Save high scores with name entry
