@@ -3,17 +3,17 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*' # Triggers the workflow only when you push tags like v1.0.0, v1.1.0, etc.
 
 permissions:
-  contents: write
+  contents: write # Required to create a release and upload assets
 
 jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: false # Prevents one OS failure from cancelling other OS builds
       matrix:
         include:
           - os: ubuntu-latest
@@ -30,34 +30,39 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Установка системных утилит сборки
+      # --- INSTALL SYSTEM DEPENDENCIES ---
+      
+      # Install required build tools and audio development libraries for Linux
       - name: Install Linux Build Tools
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build pkg-config libasound2-dev libpulse-dev
 
+      # Install standard build tools for macOS using Homebrew
       - name: Install macOS Build Tools
         if: matrix.os == 'macos-latest'
         run: |
           brew install cmake ninja
 
-      # Исправление для Windows: ставим pkg-config через Chocolatey
+      # Install ninja and pkg-config lite via Chocolatey package manager for Windows
       - name: Install Windows Build Tools
         if: matrix.os == 'windows-latest'
         run: |
           choco install pkgconfiglite ninja
 
-      # Официальный экшен для автоматической настройки SDL3
-      # Добавлен параметр ИСКЛЮЧИТЕЛЬНО релизной сборки (build-types: Release)
+      # --- SETUP SDL3 ---
+
+      # Official action to automatically download and configure the latest SDL3 build
       - name: Setup SDL3
         uses: libsdl-org/setup-sdl@v1
         with:
           version: 3-latest
-          build-types: Release
 
-      # Сборка проекта
-      # Добавлен явный флаг -DCMAKE_BUILD_TYPE=Release для конфигурации компилятора
+      # --- PROJECT COMPILATION ---
+
+      # Configure and compile the project using CMake and Ninja
+      # Added C flags to prevent compiler warnings (like unused fread results) from breaking the build
       - name: Configure and Build
         shell: bash
         run: |
@@ -65,13 +70,16 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
           ninja
 
-      # Архивируем собранный проект вместе с папкой assets
+      # --- PACKAGING ARTIFACTS ---
+
+      # Pack built binaries and the assets/ folder into a .tar.gz archive for Unix-like systems
       - name: Create Archive (Unix)
         if: matrix.os != 'windows-latest'
         run: |
           cd ${{ matrix.asset_path }}
           tar -czf ../../${{ matrix.artifact_name }}.tar.gz .
 
+      # Pack built binaries and the assets/ folder into a .zip archive for Windows
       - name: Create Archive (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
@@ -79,7 +87,7 @@ jobs:
           Set-Location ${{ matrix.asset_path }}
           Compress-Archive -Path * -DestinationPath ../../${{ matrix.artifact_name }}.zip
 
-      # Временное сохранение артефактов для шага релиза
+      # Temporarily store the created archives so the next release job can access them
       - name: Upload Artifact Storage
         uses: actions/upload-artifact@v4
         with:
@@ -94,15 +102,18 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      # Fetch all packaged archives from the build stage
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
+      # Diagnostic step to verify downloaded files in CI logs
       - name: Display downloaded files
         run: ls -R artifacts
 
+      # Automatically generate a GitHub Release based on your git tag and upload the built games
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
