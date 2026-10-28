@@ -3,17 +3,17 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*' # Triggers the workflow only when you push tags like v1.0.0, v1.1.0, etc.
 
 permissions:
-  contents: write
+  contents: write # Required to create a release and upload assets
 
 jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: false # Prevents one OS failure from cancelling other OS builds
       matrix:
         include:
           - os: ubuntu-latest
@@ -43,19 +43,19 @@ jobs:
         run: |
           brew install cmake ninja
 
-      # --- WINDOWS MINGW SETUP (Replicating local build) ---
-      - name: Setup MinGW and SDL3 on Windows
+      # --- WINDOWS MSYS2 SETUP (Fixed package names casing and migrated to UCRT64) ---
+      - name: Setup MSYS2 and Dependencies on Windows
         if: matrix.os == 'windows-latest'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: true
           install: >-
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja
-            mingw-w64-x86_64-pkg-config
-            mingw-w64-x86_64-SDL3
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkg-config
+            mingw-w64-ucrt-x86_64-sdl3
 
       # --- SETUP SDL3 FOR UNIX (Linux/macOS only) ---
       - name: Setup SDL3 (Unix)
@@ -65,29 +65,29 @@ jobs:
           version: 3-latest
 
       # --- COMPILATION ---
-      # Linux and macOS build via standard bash
+      # Linux and macOS compilation
       - name: Configure and Build (Unix)
         if: matrix.os != 'windows-latest'
         shell: bash
         run: |
           mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
-          cmake --build . --config Release
+          cmake --build .
 
-      # Windows build via MSYS2 (MinGW64 environment)
-      - name: Configure and Build (Windows MinGW)
+      # Windows compilation inside MSYS2 UCRT64 environment
+      - name: Configure and Build (Windows UCRT64)
         if: matrix.os == 'windows-latest'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           keepintpath: true
           run: |
             mkdir build && cd build
             cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
-            cmake --build . --config Release
+            cmake --build .
             
-            # Copy the correct MinGW SDL3.dll alongside the executable if CMake didn't do it automatically
-            cp /mingw64/bin/SDL3.dll dist/ 2>/dev/null || true
+            # Copy the production-ready SDL3.dll from MSYS2 alongside your game executable
+            cp /ucrt64/bin/SDL3.dll dist/ 2>/dev/null || true
 
       # --- PACKAGING ---
       - name: Create Archive (Unix)
