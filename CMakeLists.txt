@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(eaglenest VERSION 1.0.0 LANGUAGES C)
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
 # Windows resource compiler, used to embed the application icon into the .exe.
 if(WIN32)
     enable_language(RC)
@@ -54,6 +56,7 @@ set(COMMON_SOURCES
     src/input/input.c
     src/audio/audio.c
     src/audio/mod.c
+    src/assets/embedded_assets.c
     src/game/game.c
     src/game/cheats.c
     src/game/entities.c
@@ -68,6 +71,16 @@ set(COMMON_SOURCES
     src/game/objdata.c
     src/game/highscore.c
 )
+
+add_custom_command(
+    OUTPUT ${CMAKE_SOURCE_DIR}/src/assets/embedded_assets.c ${CMAKE_SOURCE_DIR}/src/assets/embedded_assets.h
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/embed_assets.py ${CMAKE_SOURCE_DIR}/assets ${CMAKE_SOURCE_DIR}/src/assets
+    DEPENDS ${CMAKE_SOURCE_DIR}/tools/embed_assets.py
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Embedding assets into binary"
+)
+
+add_custom_target(embed_assets DEPENDS ${CMAKE_SOURCE_DIR}/src/assets/embedded_assets.c ${CMAKE_SOURCE_DIR}/src/assets/embedded_assets.h)
 
 # Embed the hero-pictogram application icon into the Windows executable. The
 # .ico is generated from the tileset by tools/make_icon.py.
@@ -144,13 +157,8 @@ add_custom_target(assets
     DEPENDS convert_assets
 )
 
-# Runtime assets: copy the whole assets tree next to the executable so it can be
-# launched standalone (e.g. from Explorer, whose working directory is the exe's
-# folder) without depending on the source tree.
-add_custom_command(TARGET eaglenest POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:eaglenest>/assets
-    COMMENT "Copying assets next to the executable")
+# Runtime assets: assets are now embedded into the binary, so no need to copy
+# the assets directory next to the executable.
 
 # Windows: copy the MSYS2 runtime DLLs the executable needs next to it, so it
 # runs on a machine without MSYS2 on PATH.
