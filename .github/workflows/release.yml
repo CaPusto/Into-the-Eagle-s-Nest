@@ -3,7 +3,7 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*' # Запускает сборку при создании тегов вроде v1.0.0, v1.1.0-beta
+      - 'v*' # Запускает сборку при создании тегов вроде v1.0.0, v1.1.0
 
 permissions:
   contents: write
@@ -30,56 +30,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --- НАСТРОЙКА ЗАВИСИМОСТЕЙ ---
-      
-      # Linux: Ставим SDL3 из официального PPA или собираем (в ubuntu-latest SDL3 может отсутствовать в apt, поэтому ставим зависимости для сборки)
-      - name: Install Linux Dependencies
+      # Установка системных утилит сборки
+      - name: Install Linux Build Tools
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build pkg-config libasound2-dev libpulse-dev libaudioio-dev
+          sudo apt-get install -y cmake ninja-build pkg-config libasound2-dev libpulse-dev
 
-      # Windows: Используем vcpkg для быстрой установки SDL3
-      - name: Install Windows Dependencies (vcpkg)
-        if: matrix.os == 'windows-latest'
-        run: |
-          vcpkg install sdl3:x64-windows
-
-      # macOS: Ставим через Homebrew
-      - name: Install macOS Dependencies
+      - name: Install macOS Build Tools
         if: matrix.os == 'macos-latest'
         run: |
-          brew install cmake ninja sdl3
+          brew install cmake ninja
 
-      # --- СБОРКА ПРОЕКТА ---
+      # Официальный экшен для автоматической настройки SDL3 на любой ОС
+      - name: Setup SDL3
+        uses: libsdl-org/setup-sdl@v1
+        with:
+          version: 3-latest
 
-      # Сборка под Linux / macOS
-      - name: Configure and Build (Linux/macOS)
-        if: matrix.os != 'windows-latest'
+      # Сборка проекта с помощью CMake и Ninja
+      - name: Configure and Build
         run: |
           mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja
           ninja
 
-      # Сборка под Windows (интеграция с vcpkg)
-      - name: Configure and Build (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
-          ninja
-
-      # --- УПАКОВКА АРТЕФАКТОВ ---
-
-      # Для Windows нужно убедиться, что SDL3.dll лежит рядом с exe (ваша CMake конфигурация должна это делать, но подстрахуемся)
-      - name: Prepare Windows Package
-        if: matrix.os == 'windows-latest'
-        run: |
-          if (Test-Path "C:/vcpkg/packages/sdl3_x64-windows/bin/SDL3.dll") {
-            Copy-Item "C:/vcpkg/packages/sdl3_x64-windows/bin/SDL3.dll" -Destination "${{ matrix.asset_path }}"
-          }
-
-      # Архивируем бинарники вместе с папкой assets
+      # Архивируем собранный проект вместе с папкой assets
       - name: Create Archive (Unix)
         if: matrix.os != 'windows-latest'
         run: |
