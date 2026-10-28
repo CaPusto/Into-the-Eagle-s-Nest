@@ -43,7 +43,7 @@ jobs:
         run: |
           brew install cmake ninja
 
-      # --- WINDOWS MSYS2 SETUP (Fixed package names casing and migrated to UCRT64) ---
+      # --- WINDOWS MSYS2 SETUP ---
       - name: Setup MSYS2 and Dependencies on Windows
         if: matrix.os == 'windows-latest'
         uses: msys2/setup-msys2@v2
@@ -74,20 +74,17 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
           cmake --build .
 
-      # Windows compilation inside MSYS2 UCRT64 environment
+      # Windows compilation inside the previously configured MSYS2 UCRT64 environment
       - name: Configure and Build (Windows UCRT64)
         if: matrix.os == 'windows-latest'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          keepintpath: true
-          run: |
-            mkdir build && cd build
-            cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
-            cmake --build .
-            
-            # Copy the production-ready SDL3.dll from MSYS2 alongside your game executable
-            cp /ucrt64/bin/SDL3.dll dist/ 2>/dev/null || true
+        shell: msys2 {0}
+        run: |
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
+          cmake --build .
+          
+          # Copy the production-ready SDL3.dll from MSYS2 alongside your game executable
+          cp /ucrt64/bin/SDL3.dll dist/ 2>/dev/null || true
 
       # --- PACKAGING ---
       - name: Create Archive (Unix)
@@ -103,6 +100,7 @@ jobs:
           Set-Location ${{ matrix.asset_path }}
           Compress-Archive -Path * -DestinationPath ../../${{ matrix.artifact_name }}.zip
 
+      # Temporarily store the created archives so the next release job can access them
       - name: Upload Artifact Storage
         uses: actions/upload-artifact@v4
         with:
