@@ -42,20 +42,22 @@ jobs:
         run: |
           brew install cmake ninja
 
-      # Исправление для Windows: ставим pkg-config через Chocolatey, чтобы CMake мог найти SDL3
+      # Исправление для Windows: ставим pkg-config через Chocolatey
       - name: Install Windows Build Tools
         if: matrix.os == 'windows-latest'
         run: |
           choco install pkgconfiglite ninja
 
       # Официальный экшен для автоматической настройки SDL3
+      # Добавлен параметр ИСКЛЮЧИТЕЛЬНО релизной сборки (build-types: Release)
       - name: Setup SDL3
         uses: libsdl-org/setup-sdl@v1
         with:
           version: 3-latest
+          build-types: Release
 
       # Сборка проекта
-      # Добавлен параметр -DCMAKE_C_FLAGS, который отключает панику компилятора при предупреждениях fread
+      # Добавлен явный флаг -DCMAKE_BUILD_TYPE=Release для конфигурации компилятора
       - name: Configure and Build
         shell: bash
         run: |
