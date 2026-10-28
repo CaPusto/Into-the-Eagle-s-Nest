@@ -55,7 +55,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          $url = "https://github.com"
+          $url = "https://github.com/libsdl-org/SDL"
           curl.exe -L -o sdl3_devel.zip $url
           # Use 7z to extract securely and bypass tar/powershell path limitations
           7z x sdl3_devel.zip
