@@ -78,6 +78,32 @@ void renderer_draw_string(int x, int y, const char* str, u8 palette_offset) {
     }
 }
 
+static bool load_embedded_scr_pal(const char* stem, u8* scr_data, size_t scr_size, u16* pal_words, size_t pal_size, bool* got_pal) {
+    char scr_name[64], pal_name[64];
+    snprintf(scr_name, sizeof(scr_name), "%s.scr", stem);
+    snprintf(pal_name, sizeof(pal_name), "%s.pal", stem);
+
+    const EmbeddedAsset* ea = embedded_asset_find(scr_name);
+    if (!ea) ea = embedded_asset_find_by_suffix(scr_name);
+    if (ea && ea->size == scr_size) {
+        memcpy(scr_data, ea->data, scr_size);
+    } else {
+        return false;
+    }
+
+    if (pal_words && pal_size) {
+        ea = embedded_asset_find(pal_name);
+        if (!ea) ea = embedded_asset_find_by_suffix(pal_name);
+        if (ea && ea->size == pal_size) {
+            memcpy(pal_words, ea->data, pal_size);
+            if (got_pal) *got_pal = true;
+            return true;
+        }
+        if (got_pal) *got_pal = false;
+    }
+    return true;
+}
+
 // Full-screen planar 320x200 image (4 planes, MSB-first, p0=pixel bit0).
 // Screen carries its own 16-color palette.
 bool screen_load_planar(const char* base_path, const char* stem, Screen* s, bool has_palette_header) {
@@ -85,6 +111,28 @@ bool screen_load_planar(const char* base_path, const char* stem, Screen* s, bool
 
     char scr[256], pal[256];
     snprintf(scr, sizeof(scr), "%s/%s.scr", base_path, stem);
+
+    bool loaded_from_embedded = false;
+    {
+        u16 words[PALETTE_SIZE];
+        bool got_pal = false;
+        loaded_from_embedded = load_embedded_scr_pal(stem, s->data, PLANAR_SIZE, has_palette_header ? words : NULL, has_palette_header ? sizeof(words) : 0, &got_pal);
+        if (loaded_from_embedded && has_palette_header && got_pal) {
+            for (int i = 0; i < PALETTE_SIZE; i++) {
+                u16 w = (u16)((words[i] << 8) | (words[i] >> 8));
+                u8 r = ((w >> 8) & 0xF) * 17;
+                u8 g = ((w >> 4) & 0xF) * 17;
+                u8 b = (w & 0xF) * 17;
+                s->palette[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
+            }
+            return true;
+        } else if (loaded_from_embedded && !has_palette_header) {
+            for (int i = 0; i < PALETTE_SIZE; i++) {
+                s->palette[i] = palette_get(i);
+            }
+            return true;
+        }
+    }
 
     SDL_IOStream* io = SDL_IOFromFile(scr, "rb");
     if (!io) return false;
