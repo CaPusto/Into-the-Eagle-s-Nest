@@ -61,14 +61,17 @@ jobs:
 
       # --- PROJECT COMPILATION ---
 
-      # Configure and compile the project using CMake and Ninja
-      # Added C flags to prevent compiler warnings (like unused fread results) from breaking the build
+      # --- PROJECT COMPILATION ---
+
+      # Configure and compile the project using CMake
+      # Added C flags to prevent compiler warnings from breaking the build
+      # Added explicit --config Release to strip Visual Studio debug runtimes on Windows
       - name: Configure and Build
         shell: bash
         run: |
           mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
-          ninja
+          cmake --build . --config Release
 
       # --- PACKAGING ARTIFACTS ---
 
