@@ -3,10 +3,10 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*' # Triggers the workflow when you push tags like v1.0.0
+      - 'v*'
 
 permissions:
-  contents: write # Required to upload assets to the release
+  contents: write
 
 jobs:
   build:
@@ -43,31 +43,12 @@ jobs:
         run: |
           brew install cmake ninja
 
-      # --- UNIX SDL3 SETUP (Linux & macOS only) ---
-      # For Linux and macOS, the official setup-sdl action works perfectly out of the box
+      # --- SETUP SDL3 FOR UNIX (Linux/macOS) ---
       - name: Setup SDL3 (Unix)
         if: matrix.os != 'windows-latest'
         uses: libsdl-org/setup-sdl@v1
         with:
           version: 3-latest
-
-      # --- WINDOWS PRE-COMPILED SDL3 SETUP ---
-      # Instead of building SDL3 from source, we download the official pre-compiled x64 binaries
-      - name: Download Official SDL3 Windows Binary
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          $url = "https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18-win32-x64.zip"
-          Invoke-WebRequest -Uri $url -OutFile "sdl3.zip"
-          Expand-Archive -Path "sdl3.zip" -DestinationPath "sdl3_dev"
-          
-          # Create a directory where CMake will look for SDL3Config.cmake
-          mkdir sdl3_dev/cmake
-          Move-Item "sdl3_dev/lib/x64/cmake/SDL3/*" -Destination "sdl3_dev/cmake"
-          
-          # Expose the download path to the global environment variables for the next steps
-          echo "SDL3_DIR=$((Get-Item .).FullName)/sdl3_dev/cmake" >> $env:GITHUB_ENV
-          echo "SDL3_BINARY_DIR=$((Get-Item .).FullName)/sdl3_dev/lib/x64" >> $env:GITHUB_ENV
 
       # --- COMPILATION ---
       
@@ -80,18 +61,20 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
           cmake --build .
 
-      # Windows compilation using native MSVC, linking against the downloaded official SDL3
+      # Windows compilation using native MSVC
       - name: Configure and Build (Windows MSVC)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           mkdir build && cd build
-          # We pass the downloaded SDL3 path to CMake so it links against the official production DLL
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DSDL3_DIR="${{ env.SDL3_DIR }}"
+          # Tell CMake to use your libs folder where SDL3.lib is located
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DSDL3_DIR="$((Get-Item ..).FullName)/libs"
           cmake --build . --config Release
           
-          # Copy the official production SDL3.dll right next to the compiled executable
-          Copy-Item "${{ env.SDL3_BINARY_DIR }}/SDL3.dll" -Destination "dist/"
+          # Just copy your pre-included official SDL3.dll straight to the final game folder
+          if (Test-Path "../libs/SDL3.dll") {
+            Copy-Item "../libs/SDL3.dll" -Destination "dist/"
+          }
 
       # --- PACKAGING ---
       - name: Create Archive (Unix)
@@ -107,7 +90,7 @@ jobs:
           Set-Location ${{ matrix.asset_path }}
           Compress-Archive -Path * -DestinationPath ../../${{ matrix.artifact_name }}.zip
 
-      # Temporarily store the created archives for the release job
+      # Temporarily store the created archives
       - name: Upload Artifact Storage
         uses: actions/upload-artifact@v4
         with:
