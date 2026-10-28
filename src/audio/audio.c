@@ -104,7 +104,21 @@ static int16_t* synth_tone(int ms, float f0, float f1, float vol, float decay_k,
     return buf;
 }
 
-static int16_t* load_raw_audio(const char* path, int* out_len) {
+static int16_t* load_raw_audio_embedded_or_file(const char* path, const char* name, int* out_len) {
+    /* Try embedded by basename */
+    const EmbeddedAsset* ea = embedded_asset_find(name);
+    if (!ea) {
+        const char* bn = strrchr(path, '/');
+        if (bn) ea = embedded_asset_find(bn + 1);
+    }
+    if (ea && ea->size > 0) {
+        int16_t* data = malloc(ea->size);
+        if (!data) return NULL;
+        memcpy(data, ea->data, ea->size);
+        *out_len = (int)(ea->size / sizeof(int16_t));
+        return data;
+    }
+
     SDL_IOStream* io = SDL_IOFromFile(path, "rb");
     if (!io) return NULL;
 
@@ -136,16 +150,30 @@ static int16_t* load_raw_audio(const char* path, int* out_len) {
 // decoder (src/audio/mod.c), so the rest of the mixer can treat it like any
 // other sample. This keeps the game's only external dependency SDL3.
 static bool load_music_module(const char* path) {
+    const EmbeddedAsset* ea = embedded_asset_find("633_fjord_attack.mod");
+    if (!ea) ea = embedded_asset_find_by_suffix("633_fjord_attack.mod");
+    void* data = NULL;
     size_t size = 0;
-    void* data = SDL_LoadFile(path, &size);
-    if (!data) {
-        SDL_Log("Music: cannot open %s: %s", path, SDL_GetError());
-        return false;
+    bool free_data = false;
+
+    if (ea) {
+        data = malloc(ea->size);
+        if (!data) return false;
+        memcpy(data, ea->data, ea->size);
+        size = ea->size;
+        free_data = true;
+    } else {
+        data = SDL_LoadFile(path, &size);
+        if (!data) {
+            SDL_Log("Music: cannot open %s: %s", path, SDL_GetError());
+            return false;
+        }
+        free_data = true;
     }
 
     int frames = 0;
     int16_t* buf = mod_render_pcm(data, size, AUDIO_SAMPLE_RATE, &frames);
-    SDL_free(data);
+    if (free_data) free(data);
 
     if (!buf || frames <= 0) {
         SDL_Log("Music: could not decode module %s", path);
@@ -162,13 +190,13 @@ bool audio_load_assets(const char* base_path) {
     char path[256];
 
     snprintf(path, sizeof(path), "%s/gun.raw", base_path);
-    g_sfx_gun = load_raw_audio(path, &g_sfx_gun_len);
+    g_sfx_gun = load_raw_audio_embedded_or_file(path, "gun.raw", &g_sfx_gun_len);
 
     snprintf(path, sizeof(path), "%s/clank.raw", base_path);
-    g_sfx_clank = load_raw_audio(path, &g_sfx_clank_len);
+    g_sfx_clank = load_raw_audio_embedded_or_file(path, "clank.raw", &g_sfx_clank_len);
 
     snprintf(path, sizeof(path), "%s/bang.raw", base_path);
-    g_sfx_bang = load_raw_audio(path, &g_sfx_bang_len);
+    g_sfx_bang = load_raw_audio_embedded_or_file(path, "bang.raw", &g_sfx_bang_len);
 
     snprintf(path, sizeof(path), "%s/music/633_fjord_attack.mod", base_path);
     load_music_module(path);
