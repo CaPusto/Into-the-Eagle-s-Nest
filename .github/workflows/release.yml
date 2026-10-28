@@ -50,27 +50,15 @@ jobs:
         with:
           version: 3-latest
 
-      # --- WINDOWS SETUP (Safe and fast download using native Actions) ---
-      # This downloads only the official pre-compiled developer files directly into the CI environment
-      - name: Download SDL3 Devel files for Windows Build
-        if: matrix.os == 'windows-latest'
-        uses: actions/checkout@v4
-        with:
-          repository: libsdl-org/SDL
-          ref: release-3.4.18
-          path: sdl3_source
-          sparse-checkout: |
-            VisualC/pkg-support/cmake
-
-      # Move CMake files to a fixed directory for CMake to discover them instantly
+      # --- WINDOWS SETUP (Using 7-Zip for rock-solid extraction) ---
       - name: Prepare Windows SDL3 Directory
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          # Use official action to download precompiled binaries securely
           $url = "https://github.com"
           curl.exe -L -o sdl3_devel.zip $url
-          tar.exe -xf sdl3_devel.zip
+          # Use 7z to extract securely and bypass tar/powershell path limitations
+          7z x sdl3_devel.zip
           $extractedDir = Get-ChildItem -Directory -Filter "SDL3-*" | Select-Object -First 1
           echo "SDL3_DIR=$($extractedDir.FullName)/lib/x64/cmake/SDL3" >> $env:GITHUB_ENV
 
