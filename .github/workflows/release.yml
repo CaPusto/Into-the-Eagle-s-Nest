@@ -3,10 +3,10 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*' # Triggers on any tag push starting with 'v' (e.g., v1.0.0)
+      - 'v*' # Запускает сборку при создании тегов вроде v1.0.0, v1.1.0-beta
 
 permissions:
-  contents: write # Required to create a release and upload assets
+  contents: write
 
 jobs:
   build:
@@ -27,76 +27,101 @@ jobs:
             asset_path: build/dist
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    # --- ENVIRONMENT SETUP ---
-    
-    # Linux (Ubuntu) setup with manual SDL3 installation from GitHub
-    - name: Install Linux Dependencies
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake pkg-config gcc ninja-build libasound2-dev libpulse-dev
-        # Download and install official SDL3 release since it is missing in apt
-        wget https://github.com
-        tar -xzf SDL3-3.2.0.tar.gz
-        cd SDL3-3.2.0
-        mkdir build && cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=ON -DSDL_STATIC=OFF
-        sudo cmake --build . --target install
-        sudo ldconfig
+      # --- НАСТРОЙКА ЗАВИСИМОСТЕЙ ---
+      
+      # Linux: Ставим SDL3 из официального PPA или собираем (в ubuntu-latest SDL3 может отсутствовать в apt, поэтому ставим зависимости для сборки)
+      - name: Install Linux Dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build pkg-config libasound2-dev libpulse-dev libaudioio-dev
 
-    # Windows (MSYS2/MinGW64) setup
-    - name: Set up MSYS2 (Windows)
-      if: matrix.os == 'windows-latest'
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW64
-        update: true
-        install: >-
-          mingw-w64-x86_64-cmake
-          mingw-w64-x86_64-pkg-config
-          mingw-w64-x86_64-gcc
-          mingw-w64-x86_64-sdl3
+      # Windows: Используем vcpkg для быстрой установки SDL3
+      - name: Install Windows Dependencies (vcpkg)
+        if: matrix.os == 'windows-latest'
+        run: |
+          vcpkg install sdl3:x64-windows
 
-    # macOS setup
-    - name: Install macOS Dependencies
-      if: matrix.os == 'macos-latest'
-      run: |
-        brew install cmake pkg-config sdl3
+      # macOS: Ставим через Homebrew
+      - name: Install macOS Dependencies
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install cmake ninja sdl3
 
-    # --- COMPILATION ---
+      # --- СБОРКА ПРОЕКТА ---
 
-    # Standard CMake build for Linux and macOS
-    - name: Build (Linux/macOS)
-      if: matrix.os != 'windows-latest'
-      run: |
-        mkdir build && cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release
-        make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+      # Сборка под Linux / macOS
+      - name: Configure and Build (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja
+          ninja
 
-    # Windows build using the repository batch script inside MSYS2 bash
-    - name: Build (Windows MINGW64)
-      if: matrix.os == 'windows-latest'
-      shell: msys2 {0}
-      run: |
-        ./build_windows_mingw.bat
+      # Сборка под Windows (интеграция с vcpkg)
+      - name: Configure and Build (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+          ninja
 
-    # --- PACKAGING ---
+      # --- УПАКОВКА АРТЕФАКТОВ ---
 
-    # Pack Linux/macOS binaries into .tar.gz
-    - name: Archive Production Artifacts (Linux/macOS)
-      if: matrix.os != 'windows-latest'
-      run: |
-        cd ${{ matrix.asset_path }}
-        tar -czf ../../${{ matrix.artifact_name }}.tar.gz .
-        cd ../..
+      # Для Windows нужно убедиться, что SDL3.dll лежит рядом с exe (ваша CMake конфигурация должна это делать, но подстрахуемся)
+      - name: Prepare Windows Package
+        if: matrix.os == 'windows-latest'
+        run: |
+          if (Test-Path "C:/vcpkg/packages/sdl3_x64-windows/bin/SDL3.dll") {
+            Copy-Item "C:/vcpkg/packages/sdl3_x64-windows/bin/SDL3.dll" -Destination "${{ matrix.asset_path }}"
+          }
 
-    # Pack Windows files (Running strictly inside MSYS2 shell to ensure right paths)
-    - name: Archive Production Artifacts (Windows)
-      if: matrix.os == 'windows-latest'
-      shell: msys2 {0}
-      run: |
-        cd build/dist
-        tar -caf ../../eaglenest-windows.zip *
+      # Архивируем бинарники вместе с папкой assets
+      - name: Create Archive (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd ${{ matrix.asset_path }}
+          tar -czf ../../${{ matrix.artifact_name }}.tar.gz .
+
+      - name: Create Archive (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Set-Location ${{ matrix.asset_path }}
+          Compress-Archive -Path * -DestinationPath ../../${{ matrix.artifact_name }}.zip
+
+      # Временное сохранение артефактов для шага релиза
+      - name: Upload Artifact Storage
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            *.tar.gz
+            *.zip
+          retention-days: 1
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Display downloaded files
+        run: ls -R artifacts
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.tar.gz
+            artifacts/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
