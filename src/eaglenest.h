@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #ifndef SDL_H_MISSING
 #include <SDL3/SDL.h>
+#include "assets/embedded_assets.h"
 #else
 // Stub types for syntax checking without SDL3
 typedef struct SDL_Window SDL_Window;
