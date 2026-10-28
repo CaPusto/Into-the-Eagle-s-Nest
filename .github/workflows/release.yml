@@ -55,7 +55,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          $url = "https://github.com"
+          $url = "https://github.com/libsdl-org/SDL"
           Invoke-WebRequest -Uri $url -OutFile "sdl3_devel.zip"
           Expand-Archive -Path "sdl3_devel.zip" -DestinationPath "sdl3_devel"
           # Find the exact path to CMake configs in the extracted devel folder
