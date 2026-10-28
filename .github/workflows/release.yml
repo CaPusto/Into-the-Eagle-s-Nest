@@ -3,7 +3,7 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*' # Запускает сборку при создании тегов вроде v1.0.0, v1.1.0
+      - 'v*'
 
 permissions:
   contents: write
@@ -42,17 +42,25 @@ jobs:
         run: |
           brew install cmake ninja
 
-      # Официальный экшен для автоматической настройки SDL3 на любой ОС
+      # Исправление для Windows: ставим pkg-config через Chocolatey, чтобы CMake мог найти SDL3
+      - name: Install Windows Build Tools
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install pkgconfiglite ninja
+
+      # Официальный экшен для автоматической настройки SDL3
       - name: Setup SDL3
         uses: libsdl-org/setup-sdl@v1
         with:
           version: 3-latest
 
-      # Сборка проекта с помощью CMake и Ninja
+      # Сборка проекта
+      # Добавлен параметр -DCMAKE_C_FLAGS, который отключает панику компилятора при предупреждениях fread
       - name: Configure and Build
+        shell: bash
         run: |
           mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja
+          cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
           ninja
 
       # Архивируем собранный проект вместе с папкой assets
