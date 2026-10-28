@@ -5,42 +5,46 @@ void tiles_init(void) {
     memset(g_font, 0, sizeof(g_font));
 }
 
-bool tiles_load_tileset(const char* path) {
+static bool tiles_load_from_path_or_embedded(const char* path, const char* name, void* dst, size_t expected) {
+    /* Try embedded first by basename */
+    const EmbeddedAsset* ea = embedded_asset_find(name);
+    if (ea && ea->size == expected) {
+        memcpy(dst, ea->data, expected);
+        return true;
+    }
+    /* Try by full relative if passed differently */
+    const char* bn = strrchr(path, '/');
+    if (bn) {
+        ea = embedded_asset_find(bn + 1);
+        if (ea && ea->size == expected) {
+            memcpy(dst, ea->data, expected);
+            return true;
+        }
+    }
     SDL_IOStream* io = SDL_IOFromFile(path, "rb");
     if (!io) return false;
-
-    size_t read = SDL_ReadIO(io, g_tileset, sizeof(Tile) * 256);
+    size_t read = SDL_ReadIO(io, dst, expected);
     SDL_CloseIO(io);
-    return read == sizeof(Tile) * 256;
+    return read == expected;
+}
+
+bool tiles_load_tileset(const char* path) {
+    return tiles_load_from_path_or_embedded(path, "tileset.bin", g_tileset, sizeof(Tile) * 256);
 }
 
 bool tiles_load_font(const char* path) {
-    SDL_IOStream* io = SDL_IOFromFile(path, "rb");
-    if (!io) return false;
-
-    size_t read = SDL_ReadIO(io, g_font, sizeof(Tile) * 46);
-    SDL_CloseIO(io);
-    return read == sizeof(Tile) * 46;
+    return tiles_load_from_path_or_embedded(path, "font.bin", g_font, sizeof(Tile) * 46);
 }
 
 bool tiles_load_blocks(const char* path) {
-    SDL_IOStream* io = SDL_IOFromFile(path, "rb");
-    if (!io) return false;
-
-    size_t read = SDL_ReadIO(io, g_block_data, sizeof(g_block_data));
-    SDL_CloseIO(io);
-    return read == sizeof(g_block_data);
+    return tiles_load_from_path_or_embedded(path, "blocks.bin", g_block_data, sizeof(g_block_data));
 }
 
 bool tiles_load_map(int map_index, const char* path) {
     if (map_index < 0 || map_index >= 8) return false;
-
-    SDL_IOStream* io = SDL_IOFromFile(path, "rb");
-    if (!io) return false;
-
-    size_t read = SDL_ReadIO(io, g_maps[map_index].tiles, MAP_FILE_SIZE);
-    SDL_CloseIO(io);
-    return read == MAP_FILE_SIZE;
+    char name[32];
+    snprintf(name, sizeof(name), "map%d.bin", map_index);
+    return tiles_load_from_path_or_embedded(path, name, g_maps[map_index].tiles, MAP_FILE_SIZE);
 }
 
 bool tiles_load_all_assets(const char* base_path) {
