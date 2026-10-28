@@ -50,6 +50,18 @@ jobs:
         with:
           version: 3-latest
 
+      # --- WINDOWS SETUP (Temporary Devel Files for Compiler Only) ---
+      - name: Download SDL3 Devel files for Windows Build
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $url = "https://github.com"
+          Invoke-WebRequest -Uri $url -OutFile "sdl3_devel.zip"
+          Expand-Archive -Path "sdl3_devel.zip" -DestinationPath "sdl3_devel"
+          # Find the exact path to CMake configs in the extracted devel folder
+          $cfgPath = (Get-ChildItem -Path "sdl3_devel" -Filter "SDL3Config.cmake" -Recurse).Directory.FullName
+          echo "SDL3_DIR=$cfgPath" >> $env:GITHUB_ENV
+
       # --- COMPILATION ---
       
       # Standard Unix compilation (Linux/macOS)
@@ -61,17 +73,20 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
           cmake --build .
 
-      # Windows compilation using native MSVC
+      # Windows compilation using MSVC pointing to the temporary devel config
       - name: Configure and Build (Windows MSVC)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           mkdir build && cd build
-          # Tell CMake to use your libs folder where SDL3.lib is located
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DSDL3_DIR="$((Get-Item ..).FullName)/libs"
+          # Pass SDL3_DIR to CMake so find_package works successfully without pkg-config
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DSDL3_DIR="${{ env.SDL3_DIR }}"
           cmake --build . --config Release
           
-          # Just copy your pre-included official SDL3.dll straight to the final game folder
+          # Create target dist folder if CMake didn't create it during configuration
+          if (-not (Test-Path "dist")) { mkdir "dist" }
+          
+          # Copy your custom, production-ready SDL3.dll from the repository libs/ directory
           if (Test-Path "../libs/SDL3.dll") {
             Copy-Item "../libs/SDL3.dll" -Destination "dist/"
           }
