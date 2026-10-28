@@ -3,17 +3,17 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*' # Triggers the workflow only when you push tags like v1.0.0, v1.1.0, etc.
+      - 'v*'
 
 permissions:
-  contents: write # Required to create a release and upload assets
+  contents: write
 
 jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # Prevents one OS failure from cancelling other OS builds
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -30,59 +30,72 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --- INSTALL SYSTEM DEPENDENCIES ---
-      
-      # Install required build tools and audio development libraries for Linux
+      # --- LINUX DEPENDENCIES ---
       - name: Install Linux Build Tools
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build pkg-config libasound2-dev libpulse-dev
 
-      # Install standard build tools for macOS using Homebrew
+      # --- MACOS DEPENDENCIES ---
       - name: Install macOS Build Tools
         if: matrix.os == 'macos-latest'
         run: |
           brew install cmake ninja
 
-      # Install ninja and pkg-config lite via Chocolatey package manager for Windows
-      - name: Install Windows Build Tools
+      # --- WINDOWS MINGW SETUP (Replicating local build) ---
+      - name: Setup MinGW and SDL3 on Windows
         if: matrix.os == 'windows-latest'
-        run: |
-          choco install pkgconfiglite ninja
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkg-config
+            mingw-w64-x86_64-SDL3
 
-      # --- SETUP SDL3 ---
-
-      # Official action to automatically download and configure the latest SDL3 build
-      - name: Setup SDL3
+      # --- SETUP SDL3 FOR UNIX (Linux/macOS only) ---
+      - name: Setup SDL3 (Unix)
+        if: matrix.os != 'windows-latest'
         uses: libsdl-org/setup-sdl@v1
         with:
           version: 3-latest
 
-      # --- PROJECT COMPILATION ---
-
-      # --- PROJECT COMPILATION ---
-
-      # Configure and compile the project using CMake
-      # Added C flags to prevent compiler warnings from breaking the build
-      # Added explicit --config Release to strip Visual Studio debug runtimes on Windows
-      - name: Configure and Build
+      # --- COMPILATION ---
+      # Linux and macOS build via standard bash
+      - name: Configure and Build (Unix)
+        if: matrix.os != 'windows-latest'
         shell: bash
         run: |
           mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
           cmake --build . --config Release
 
-      # --- PACKAGING ARTIFACTS ---
+      # Windows build via MSYS2 (MinGW64 environment)
+      - name: Configure and Build (Windows MinGW)
+        if: matrix.os == 'windows-latest'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          keepintpath: true
+          run: |
+            mkdir build && cd build
+            cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
+            cmake --build . --config Release
+            
+            # Copy the correct MinGW SDL3.dll alongside the executable if CMake didn't do it automatically
+            cp /mingw64/bin/SDL3.dll dist/ 2>/dev/null || true
 
-      # Pack built binaries and the assets/ folder into a .tar.gz archive for Unix-like systems
+      # --- PACKAGING ---
       - name: Create Archive (Unix)
         if: matrix.os != 'windows-latest'
         run: |
           cd ${{ matrix.asset_path }}
           tar -czf ../../${{ matrix.artifact_name }}.tar.gz .
 
-      # Pack built binaries and the assets/ folder into a .zip archive for Windows
       - name: Create Archive (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
@@ -90,7 +103,6 @@ jobs:
           Set-Location ${{ matrix.asset_path }}
           Compress-Archive -Path * -DestinationPath ../../${{ matrix.artifact_name }}.zip
 
-      # Temporarily store the created archives so the next release job can access them
       - name: Upload Artifact Storage
         uses: actions/upload-artifact@v4
         with:
@@ -105,18 +117,15 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      # Fetch all packaged archives from the build stage
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
-      # Diagnostic step to verify downloaded files in CI logs
       - name: Display downloaded files
         run: ls -R artifacts
 
-      # Automatically generate a GitHub Release based on your git tag and upload the built games
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
