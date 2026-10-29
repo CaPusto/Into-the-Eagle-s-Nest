@@ -29,45 +29,50 @@ jobs:
     - name: Configure CMake for Project
       shell: powershell
       run: |
-        # 1. Disable pkg-config
         (Get-Content CMakeLists.txt) `
           -replace 'find_package\(PkgConfig REQUIRED\)', '# find_package(PkgConfig REQUIRED)' `
           -replace 'pkg_check_modules\(SDL3 REQUIRED sdl3\)', '# pkg_check_modules(SDL3 REQUIRED sdl3)' `
           | Set-Content CMakeLists.txt
 
-        # 2. Remove Unix math library linking
         (Get-Content CMakeLists.txt) `
           -replace 'target_link_libraries\(eaglenest \$\{SDL3_LIBRARIES\} m\)', 'target_link_libraries(eaglenest ${SDL3_LIBRARIES})' `
           -replace 'target_link_libraries\(mapview \$\{SDL3_LIBRARIES\} m\)', 'target_link_libraries(mapview ${SDL3_LIBRARIES})' `
           | Set-Content CMakeLists.txt
 
-        # 3. Create include, link paths injection and force MSVC to compile ALL files as C++ via CMAKE_C_FLAGS
-        # This acts globally on MSBuild level and completely bypasses custom rules recreation bugs.
-        # We also redirect WinMain entry points natively.
-        @'
+        @"
         include_directories("C:/SDL3_Built/include")
         link_libraries("C:/SDL3_Built/lib/SDL3.lib")
         set(SDL3_LIBRARIES "C:/SDL3_Built/lib/SDL3.lib" CACHE INTERNAL "")
-        
-        if(MSVC)
-          set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /TP" CACHE STRING "" FORCE)
-          set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /TP" CACHE STRING "" FORCE)
-          set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE" CACHE STRING "" FORCE)
-        endif()
-        '@ | Set-Content "C:/inject.cmake"
+        "@ | Set-Content "C:/inject.cmake"
 
         cmake -B build -S . `
           -DCMAKE_BUILD_TYPE=Release `
           -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON `
           -DCMAKE_PROJECT_INCLUDE_BEFORE="C:/inject.cmake"
 
-    - name: Disable TreatWarningsAsErrors in Projects
+    - name: Patch Visual Studio Projects for C++ and Warnings
       shell: powershell
       run: |
+        # 1. Принудительно отключаем TreatWarningAsError на уровне XML для всех vcxproj
         Get-ChildItem -Path build -Filter *.vcxproj -Recurse | ForEach-Object {
           (Get-Content $_.FullName) `
             -replace '<TreatWarningAsError>true</TreatWarningAsError>', '<TreatWarningAsError>false</TreatWarningAsError>' `
             | Set-Content $_.FullName
+        }
+        
+        # 2. Жестко инжектируем режим компиляции как C++ (CompileAsCpp) и смену точки входа 
+        # прямо в конфигурацию компилятора и линкера внутри XML файлов vcxproj.
+        # Это сработает для абсолютно всех файлов, включая генерируемые на лету встроенные ассеты.
+        Get-ChildItem -Path build -Filter *.vcxproj -Recurse | ForEach-Object {
+          $content = Get-Content $_.FullName -Raw
+          
+          # Внедряем принудительный C++ режим компиляции
+          $content = $content -replace '<ClCompile>', '<ClCompile><CompileAs>CompileAsCpp</CompileAs>'
+          
+          # Исправляем точку входа для графических окон, чтобы линкер MSVC искал стандартный main
+          $content = $content -replace '<Link>', '<Link><EntryPointSymbol>mainCRTStartup</EntryPointSymbol><SubSystem>Console</SubSystem>'
+          
+          Set-Content $_.FullName $content -NoNewline
         }
 
     - name: Build Project
