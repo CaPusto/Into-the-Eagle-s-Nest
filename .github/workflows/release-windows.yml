@@ -21,7 +21,6 @@ jobs:
       with:
         msystem: MINGW64
         update: true
-        # Ставим GCC, CMake и PkgConfig, собранные специально под Windows (MinGW64)
         install: >-
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-pkg-config
@@ -30,23 +29,20 @@ jobs:
     - name: Download SDL3 Development Pack for MinGW
       shell: msys2 {0}
       run: |
-        # Скачиваем официальный пакет разработки SDL3 для MinGW
         curl -Lf -o sdl3_mingw.zip 'https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-devel-3.4.18-mingw.zip'
         unzip sdl3_mingw.zip
-        # Переносим файлы сборки MinGW в системные пути MSYS2, чтобы pkg-config мгновенно их увидел
-        cp -r SDL3-devel-3.4.18-mingw/SDL3-3.4.18/x86_64-w64-mingw32/* /mingw64/
+        # Исправлен путь: файлы копируются из реально созданной папки SDL3-3.4.18
+        cp -r SDL3-3.4.18/x86_64-w64-mingw32/* /mingw64/
 
     - name: Build Project with MinGW
       shell: msys2 {0}
       run: |
-        # Собираем проект через GCC в среде MSYS2. Ваши правила pkg-config теперь отработают штатно
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -G "MinGW Makefiles"
         cmake --build build
 
     - name: Deploy Your Local SDL3.dll
       shell: powershell
       run: |
-        # Подкладываем вашу проверенную DLL из папки libs в папку dist перед упаковкой
         Copy-Item -Path "libs/SDL3.dll" -Destination "build/dist/" -Force
 
     - name: Package Release Directory
