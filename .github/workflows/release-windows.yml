@@ -29,26 +29,23 @@ jobs:
     - name: Configure CMake for Project
       shell: powershell
       run: |
-        # 1. Отключаем вызовы pkg-config, которые ломают MSVC
+        
         (Get-Content CMakeLists.txt) `
           -replace 'find_package\(PkgConfig REQUIRED\)', '# find_package(PkgConfig REQUIRED)' `
           -replace 'pkg_check_modules\(SDL3 REQUIRED sdl3\)', '# pkg_check_modules(SDL3 REQUIRED sdl3)' `
           | Set-Content CMakeLists.txt
 
-        # 2. Исправляем проблему инклудов: принудительно заменяем пустую переменную SDL3_INCLUDE_DIRS
-        # на реальный физический путь к инклудам собранной SDL3
+        
         (Get-Content CMakeLists.txt) `
           -replace 'include_directories\(\$\{SDL3_INCLUDE_DIRS\}\)', 'include_directories("C:/SDL3_Built/include")' `
           | Set-Content CMakeLists.txt
 
-        # 3. Добавляем .lib файл собранной SDL3 напрямую в линковку таргетов игры и mapview
-        Add-Content CMakeLists.txt "`ntarget_link_libraries(eaglenest PRIVATE `"C:/SDL3_Built/lib/SDL3.lib`")"
-        Add-Content CMakeLists.txt "`ntarget_link_libraries(mapview PRIVATE `"C:/SDL3_Built/lib/SDL3.lib`")"
+        (Get-Content CMakeLists.txt) `
+          -replace '\$\{SDL3_LIBRARIES\}', '"C:/SDL3_Built/lib/SDL3.lib"' `
+          | Set-Content CMakeLists.txt
 
-        # 4. Исправляем проблему неконстантных инициализаторов в embedded_assets.c (ошибка C2099)
         Add-Content CMakeLists.txt "`nset_source_files_properties(src/assets/embedded_assets.c PROPERTIES COMPILE_FLAGS /TP)"
 
-        # Запускаем конфигурацию
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON
 
     - name: Build Project
