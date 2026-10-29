@@ -16,16 +16,18 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Download SDL3 Development Pack
+    - name: Clone SDL3 Source
       run: |
-        curl -Lf -o sdl3_devel.zip 'https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-devel-3.4.18-VC.zip'
+        git clone 'https://github.com/libsdl-org/SDL' --depth=1 -b main
 
-    - name: Extract SDL3 Development Pack
+    - name: Build and Install SDL3 from Source (Windows)
       shell: powershell
       run: |
-        Expand-Archive -Path "sdl3_devel.zip" -DestinationPath "C:\SDL3"
+        # Компилируем официальный SDL3 нативной сборкой MSVC в папку C:\SDL3_Built
+        cmake -B SDL/build -S SDL -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=ON -DSDL_STATIC=OFF -DCMAKE_INSTALL_PREFIX="C:/SDL3_Built"
+        cmake --build SDL/build --config Release --target install
 
-    - name: Configure CMake
+    - name: Configure CMake for Project
       shell: powershell
       run: |
         # 1. Отключаем вызовы pkg-config, которые ломают MSVC
@@ -37,15 +39,11 @@ jobs:
         # 2. Исправляем проблему неконстантных инициализаторов в embedded_assets.c (ошибка C2099)
         Add-Content CMakeLists.txt "`nset_source_files_properties(src/assets/embedded_assets.c PROPERTIES COMPILE_FLAGS /TP)"
 
-        # 3. Передаем пути к инклудам и .lib файлу официального SDK напрямую через переменные окружения CMake.
-        # Флаг CMAKE_CXX_FLAGS / CMAKE_C_FLAGS со значением /I принудительно заставит MSVC видеть заголовочные файлы SDL3,
-        # а CMAKE_EXE_LINKER_FLAGS свяжет исполняемые файлы с библиотекой импорта.
+        # 3. Конфигурируем вашу игру, указывая CMake на только что собранный нами бэкенд SDL3
         cmake -B build -S . `
           -DCMAKE_BUILD_TYPE=Release `
           -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON `
-          -DCMAKE_C_FLAGS="/I C:/SDL3/SDL3-devel-3.4.18-VC/SDL3-3.4.18/include" `
-          -DCMAKE_CXX_FLAGS="/I C:/SDL3/SDL3-devel-3.4.18-VC/SDL3-3.4.18/include" `
-          -DCMAKE_EXE_LINKER_FLAGS="C:/SDL3/SDL3-devel-3.4.18-VC/SDL3-3.4.18/lib/x64/SDL3.lib"
+          -DSDL3_DIR="C:/SDL3_Built/share/cmake/SDL3"
 
     - name: Build Project
       shell: powershell
@@ -55,6 +53,7 @@ jobs:
     - name: Deploy Your Local SDL3.dll
       shell: powershell
       run: |
+        # Принудительно заменяем DLL в папке результатов вашей скомпилированной библиотекой
         Copy-Item -Path "libs/SDL3.dll" -Destination "build/dist/" -Force
 
     - name: Package Release Directory
