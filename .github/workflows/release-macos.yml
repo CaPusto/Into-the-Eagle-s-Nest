@@ -1,0 +1,38 @@
+name: Release macOS
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: Build macOS x64
+    runs-on: macos-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install macOS Dependencies
+      run: |
+        brew install cmake pkg-config sdl3
+
+    - name: Build macOS Project
+      run: |
+        chmod +x build_macos.sh
+        ./build_macos.sh
+
+    - name: Package Release Directory
+      run: |
+        cd build
+        zip -r ../eaglenest-macos-x64.zip dist/
+
+    - name: Upload Binary to Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: eaglenest-macos-x64.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
