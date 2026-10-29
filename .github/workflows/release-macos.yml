@@ -33,7 +33,8 @@ jobs:
         cp build/dist/eaglenest IntoTheEaglesNest.app/Contents/MacOS/
         cp build/dist/mapview IntoTheEaglesNest.app/Contents/MacOS/
         
-        cp -r build/dist/assets IntoTheEaglesNest.app/Contents/Resources/
+        # Fixed: Copy assets directly from the repository root directory
+        cp -r assets IntoTheEaglesNest.app/Contents/Resources/
         
         cat <<EOF > IntoTheEaglesNest.app/Contents/Info.plist
         <?xml version="1.0" encoding="UTF-8"?>
