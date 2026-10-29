@@ -10,79 +10,43 @@ permissions:
 
 jobs:
   build-windows:
-    name: Build Windows x64 (MSVC)
+    name: Build Windows x64 (MinGW)
     runs-on: windows-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Clone SDL3 Source
+    - name: Set up MSYS2 Environment
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        # Ставим GCC, CMake и PkgConfig, собранные специально под Windows (MinGW64)
+        install: >-
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-pkg-config
+          mingw-w64-x86_64-gcc
+
+    - name: Download SDL3 Development Pack for MinGW
+      shell: msys2 {0}
       run: |
-        git clone 'https://github.com/libsdl-org/SDL' --depth=1 -b main
+        # Скачиваем официальный пакет разработки SDL3 для MinGW
+        curl -Lf -o sdl3_mingw.zip 'https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-devel-3.4.18-mingw.zip'
+        unzip sdl3_mingw.zip
+        # Переносим файлы сборки MinGW в системные пути MSYS2, чтобы pkg-config мгновенно их увидел
+        cp -r SDL3-devel-3.4.18-mingw/SDL3-3.4.18/x86_64-w64-mingw32/* /mingw64/
 
-    - name: Build and Install SDL3 from Source (Windows)
-      shell: powershell
+    - name: Build Project with MinGW
+      shell: msys2 {0}
       run: |
-        cmake -B SDL/build -S SDL -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=ON -DSDL_STATIC=OFF -DCMAKE_INSTALL_PREFIX="C:/SDL3_Built"
-        cmake --build SDL/build --config Release --target install
-
-    - name: Configure CMake for Project
-      shell: powershell
-      run: |
-        (Get-Content CMakeLists.txt) `
-          -replace 'find_package\(PkgConfig REQUIRED\)', '# find_package(PkgConfig REQUIRED)' `
-          -replace 'pkg_check_modules\(SDL3 REQUIRED sdl3\)', '# pkg_check_modules(SDL3 REQUIRED sdl3)' `
-          | Set-Content CMakeLists.txt
-
-        (Get-Content CMakeLists.txt) `
-          -replace 'target_link_libraries\(eaglenest \$\{SDL3_LIBRARIES\} m\)', 'target_link_libraries(eaglenest ${SDL3_LIBRARIES})' `
-          -replace 'target_link_libraries\(mapview \$\{SDL3_LIBRARIES\} m\)', 'target_link_libraries(mapview ${SDL3_LIBRARIES})' `
-          | Set-Content CMakeLists.txt
-
-        @"
-        include_directories("C:/SDL3_Built/include")
-        link_libraries("C:/SDL3_Built/lib/SDL3.lib")
-        set(SDL3_LIBRARIES "C:/SDL3_Built/lib/SDL3.lib" CACHE INTERNAL "")
-        "@ | Set-Content "C:/inject.cmake"
-
-        cmake -B build -S . `
-          -DCMAKE_BUILD_TYPE=Release `
-          -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON `
-          -DCMAKE_PROJECT_INCLUDE_BEFORE="C:/inject.cmake"
-
-    - name: Patch Visual Studio Projects for C++ and Warnings
-      shell: powershell
-      run: |
-        # 1. Принудительно отключаем TreatWarningAsError на уровне XML для всех vcxproj
-        Get-ChildItem -Path build -Filter *.vcxproj -Recurse | ForEach-Object {
-          (Get-Content $_.FullName) `
-            -replace '<TreatWarningAsError>true</TreatWarningAsError>', '<TreatWarningAsError>false</TreatWarningAsError>' `
-            | Set-Content $_.FullName
-        }
-        
-        # 2. Жестко инжектируем режим компиляции как C++ (CompileAsCpp) и смену точки входа 
-        # прямо в конфигурацию компилятора и линкера внутри XML файлов vcxproj.
-        # Это сработает для абсолютно всех файлов, включая генерируемые на лету встроенные ассеты.
-        Get-ChildItem -Path build -Filter *.vcxproj -Recurse | ForEach-Object {
-          $content = Get-Content $_.FullName -Raw
-          
-          # Внедряем принудительный C++ режим компиляции
-          $content = $content -replace '<ClCompile>', '<ClCompile><CompileAs>CompileAsCpp</CompileAs>'
-          
-          # Исправляем точку входа для графических окон, чтобы линкер MSVC искал стандартный main
-          $content = $content -replace '<Link>', '<Link><EntryPointSymbol>mainCRTStartup</EntryPointSymbol><SubSystem>Console</SubSystem>'
-          
-          Set-Content $_.FullName $content -NoNewline
-        }
-
-    - name: Build Project
-      shell: powershell
-      run: |
-        cmake --build build --config Release
+        # Собираем проект через GCC в среде MSYS2. Ваши правила pkg-config теперь отработают штатно
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -G "MinGW Makefiles"
+        cmake --build build
 
     - name: Deploy Your Local SDL3.dll
       shell: powershell
       run: |
+        # Подкладываем вашу проверенную DLL из папки libs в папку dist перед упаковкой
         Copy-Item -Path "libs/SDL3.dll" -Destination "build/dist/" -Force
 
     - name: Package Release Directory
