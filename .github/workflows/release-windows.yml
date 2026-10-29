@@ -21,8 +21,11 @@ jobs:
       with:
         msystem: MINGW64
         update: true
+        # Добавлены пакеты ninja и make для Windows
         install: >-
           mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-ninja
+          mingw-w64-x86_64-make
           mingw-w64-x86_64-pkg-config
           mingw-w64-x86_64-gcc
 
@@ -31,13 +34,14 @@ jobs:
       run: |
         curl -Lf -o sdl3_mingw.zip 'https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-devel-3.4.18-mingw.zip'
         unzip sdl3_mingw.zip
-        # Исправлен путь: файлы копируются из реально созданной папки SDL3-3.4.18
         cp -r SDL3-3.4.18/x86_64-w64-mingw32/* /mingw64/
 
     - name: Build Project with MinGW
       shell: msys2 {0}
       run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -G "MinGW Makefiles"
+        # Переключаем генератор на Ninja (-G "Ninja"). 
+        # Она нативно поддерживается MSYS2 и мгновенно находит GCC компилятор.
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -G "Ninja"
         cmake --build build
 
     - name: Deploy Your Local SDL3.dll
