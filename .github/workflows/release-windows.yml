@@ -17,28 +17,38 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Download SDL3 Development Pack
+      # Скачиваем официальный стабильный пакет разработки SDL3 для MSVC
       run: |
-        curl -L -o SDL3-devel-3.4.18-VC.zip 'https://github.com/libsdl-org/SDL/releases/download/release-3.4.18'
+        curl -L -o sdl3_devel.zip 'https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-devel-3.4.18-VC.zip'
 
     - name: Extract SDL3 Development Pack
       shell: powershell
-      run: Expand-Archive -Path "SDL3-devel-3.4.18-VC.zip" -DestinationPath "C:\SDL3"
+      run: |
+        Expand-Archive -Path "sdl3_devel.zip" -DestinationPath "C:\SDL3"
 
     - name: Configure CMake
       shell: powershell
-      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DSDL3_DIR="C:/SDL3/SDL3-devel-3.4.18-VC/SDL3-3.4.18/cmake" -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON
+      run: |
+        # Конфигурируем проект через MSVC. Мы явно передаем путь к скачанному SDK 
+        # и отключаем PkgConfig, так как для компилятора Visual Studio он не нужен.
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DSDL3_DIR="C:/SDL3/SDL3-devel-3.4.18-VC/SDL3-3.4.18/cmake" -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON
 
     - name: Build Project
       shell: powershell
-      run: cmake --build build --config Release
+      run: |
+        # Запускаем сборку бинарников игры (eaglenest.exe и mapview.exe)
+        cmake --build build --config Release
 
-    - name: Prepare Windows Dist Folder
+    - name: Deploy Your Local SDL3.dll
       shell: powershell
-      run: Copy-Item -Path "libs/SDL3.dll" -Destination "build/dist/" -Force
+      run: |
+        # Принудительно заменяем DLL в папке dist на ВАШУ собственную из каталога libs
+        Copy-Item -Path "libs/SDL3.dll" -Destination "build/dist/" -Force
 
     - name: Package Release Directory
       shell: powershell
       run: |
+        # Упаковываем готовую папку dist со всеми ассетами, exe-файлами и вашей DLL в архив
         cd build
         Compress-Archive -Path "dist" -DestinationPath "../eaglenest-windows-x64.zip" -Force
 
