@@ -23,7 +23,7 @@ jobs:
 
     - name: Build and Install SDL3 from Source
       run: |
-        git clone 'https://github.com' --depth=1 -b main
+        git clone 'https://github.com/libsdl-org/SDL' --depth=1 -b main
         cd SDL
         mkdir build && cd build
         cmake .. -DCMAKE_BUILD_TYPE=Release
