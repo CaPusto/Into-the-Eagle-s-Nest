@@ -33,7 +33,6 @@ jobs:
         cp build/dist/eaglenest IntoTheEaglesNest.app/Contents/MacOS/
         cp build/dist/mapview IntoTheEaglesNest.app/Contents/MacOS/
         
-        # Fixed: Copy assets directly from the repository root directory
         cp -r assets IntoTheEaglesNest.app/Contents/Resources/
         
         cat <<EOF > IntoTheEaglesNest.app/Contents/Info.plist
@@ -59,7 +58,8 @@ jobs:
         </plist>
         EOF
         
-        zip -r ../eaglenest-macos-x64.zip IntoTheEaglesNest.app/
+        # Fixed: Removed "../" to save the zip archive directly in the repository root directory
+        zip -r eaglenest-macos-x64.zip IntoTheEaglesNest.app/
 
     - name: Upload Binary to Release
       uses: softprops/action-gh-release@v2
