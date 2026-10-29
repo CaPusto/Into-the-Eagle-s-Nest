@@ -41,16 +41,32 @@ jobs:
           -replace 'target_link_libraries\(mapview \$\{SDL3_LIBRARIES\} m\)', 'target_link_libraries(mapview ${SDL3_LIBRARIES})' `
           | Set-Content CMakeLists.txt
 
-        # 3. Create clean include and link paths injection
+        # 3. Force embedded_assets.c to compile as C++ (resolves C2099)
+        Add-Content CMakeLists.txt "`nset_source_files_properties(src/assets/embedded_assets.c PROPERTIES COMPILE_FLAGS /TP)"
+
+        # 4. Inject extern "C" into embedded_assets.h to protect function names from C++ mangling
+        $h_file = "src/assets/embedded_assets.h"
+        $h_content = Get-Content $h_file
+        $new_h_content = @"
+        #ifdef __cplusplus
+        extern "C" {
+        #endif
+        $($h_content -join "`n")
+        #ifdef __cplusplus
+        }
+        #endif
+        "@
+        Set-Content $h_file $new_h_content
+
+        # 5. Create include and link paths injection
         @"
         include_directories("C:/SDL3_Built/include")
         link_libraries("C:/SDL3_Built/lib/SDL3.lib")
         set(SDL3_LIBRARIES "C:/SDL3_Built/lib/SDL3.lib" CACHE INTERNAL "")
         
-        # Force MSVC to accept regular main() and ignore non-constant initializers in pure C mode
+        # Tell MSVC linker to look for main instead of WinMain
         if(MSVC)
-          add_compile_options(/X)
-          set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:CONSOLE")
+          set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE")
         endif()
         "@ | Set-Content "C:/inject.cmake"
 
