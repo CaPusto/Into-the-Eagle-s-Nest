@@ -32,11 +32,12 @@ jobs:
         sudo ldconfig
 
     - name: Build Linux Project
+      # Переменная окружения заставит GCC игнорировать этот варнинг во всех вызываемых вложенных скриптах
+      env:
+        CFLAGS: "-Wno-error"
       run: |
         chmod +x build_linux.sh
-        # Передаем флаг отключения трактовки варнингов как ошибок компиляции в CMake
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-Wno-error"
-        cmake --build build
+        ./build_linux.sh
 
     - name: Package Release Directory
       run: |
