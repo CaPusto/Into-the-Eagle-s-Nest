@@ -29,21 +29,17 @@ jobs:
     - name: Configure CMake for Project
       shell: powershell
       run: |
-        # 1. Отключаем вызовы pkg-config, которые ломают MSVC
         (Get-Content CMakeLists.txt) `
           -replace 'find_package\(PkgConfig REQUIRED\)', '# find_package(PkgConfig REQUIRED)' `
           -replace 'pkg_check_modules\(SDL3 REQUIRED sdl3\)', '# pkg_check_modules(SDL3 REQUIRED sdl3)' `
           | Set-Content CMakeLists.txt
 
-        # 2. Исправляем проблему неконстантных инициализаторов в embedded_assets.c (ошибка C2099)
         Add-Content CMakeLists.txt "`nset_source_files_properties(src/assets/embedded_assets.c PROPERTIES COMPILE_FLAGS /TP)"
 
-        # 3. Конфигурируем вашу игру
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON
 
     - name: Build Project
       shell: powershell
-      # Прокидываем пути к заголовочным файлам и .lib напрямую через стандартные переменные окружения MSVC
       env:
         INCLUDE: "C:\SDL3_Built\include"
         LIB: "C:\SDL3_Built\lib"
