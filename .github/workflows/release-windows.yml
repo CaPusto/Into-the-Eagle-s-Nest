@@ -29,26 +29,29 @@ jobs:
     - name: Configure CMake for Project
       shell: powershell
       run: |
-        # 1. Отключаем вызовы pkg-config, которые ломают MSVC
+        # 1. Disable pkg-config
         (Get-Content CMakeLists.txt) `
           -replace 'find_package\(PkgConfig REQUIRED\)', '# find_package(PkgConfig REQUIRED)' `
           -replace 'pkg_check_modules\(SDL3 REQUIRED sdl3\)', '# pkg_check_modules(SDL3 REQUIRED sdl3)' `
           | Set-Content CMakeLists.txt
 
-        # 2. Вырезаем линковку Unix-библиотеки математики 'm', так как в MSVC она встроенная
+        # 2. Remove Unix math library linking
         (Get-Content CMakeLists.txt) `
           -replace 'target_link_libraries\(eaglenest \$\{SDL3_LIBRARIES\} m\)', 'target_link_libraries(eaglenest ${SDL3_LIBRARIES})' `
           -replace 'target_link_libraries\(mapview \$\{SDL3_LIBRARIES\} m\)', 'target_link_libraries(mapview ${SDL3_LIBRARIES})' `
           | Set-Content CMakeLists.txt
 
-        # 3. Переводим embedded_assets.c в режим C++ (решает ошибку C2099 неконстантной инициализации)
-        Add-Content CMakeLists.txt "`nset_source_files_properties(src/assets/embedded_assets.c PROPERTIES COMPILE_FLAGS /TP)"
-
-        # 4. Создаем инъекцию путей для сборщика
+        # 3. Create clean include and link paths injection
         @"
         include_directories("C:/SDL3_Built/include")
         link_libraries("C:/SDL3_Built/lib/SDL3.lib")
         set(SDL3_LIBRARIES "C:/SDL3_Built/lib/SDL3.lib" CACHE INTERNAL "")
+        
+        # Force MSVC to accept regular main() and ignore non-constant initializers in pure C mode
+        if(MSVC)
+          add_compile_options(/X)
+          set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:CONSOLE")
+        endif()
         "@ | Set-Content "C:/inject.cmake"
 
         cmake -B build -S . `
