@@ -18,7 +18,7 @@ jobs:
           - os: ubuntu-latest
             artifact_name: eaglenest-linux-x64
           - os: macos-latest
-            artifact_name: eaglenest-macos-universal
+            artifact_name: eaglenest-macos-x64
           - os: windows-latest
             artifact_name: eaglenest-windows-x64
 
@@ -59,14 +59,24 @@ jobs:
       if: matrix.os == 'macos-latest'
       run: |
         chmod +x build_macos.sh
-        ./build_macos.sh --universal
+        ./build_macos.sh
 
     # --- СБОРКА ПОД WINDOWS (MSVC) ---
+    - name: Download SDL3 Development Pack for Compilation
+      if: matrix.os == 'windows-latest'
+      shell: powershell
+      run: |
+        Invoke-WebRequest -Uri "https://github.com" -OutFile "sdl3_devel.zip"
+        Expand-Archive -Path "sdl3_devel.zip" -DestinationPath "C:\SDL3"
+
     - name: Configure CMake (Windows)
       if: matrix.os == 'windows-latest'
       shell: powershell
       run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ github.workspace }}/libs"
+        cmake -B build -S . `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DSDL3_DIR="C:/SDL3/SDL3-devel-3.2.0-VC/SDL3-3.2.0/cmake" `
+          -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON
 
     - name: Build Project (Windows)
       if: matrix.os == 'windows-latest'
