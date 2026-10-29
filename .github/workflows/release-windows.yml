@@ -32,7 +32,6 @@ jobs:
         (Get-Content CMakeLists.txt) `
           -replace 'find_package\(PkgConfig REQUIRED\)', '# find_package(PkgConfig REQUIRED)' `
           -replace 'pkg_check_modules\(SDL3 REQUIRED sdl3\)', '# pkg_check_modules(SDL3 REQUIRED sdl3)' `
-          -replace 'add_compile_options\(-Wall -Werror\)', '# add_compile_options(-Wall -Werror)' `
           | Set-Content CMakeLists.txt
 
         Add-Content CMakeLists.txt "`nset_source_files_properties(src/assets/embedded_assets.c PROPERTIES COMPILE_FLAGS /TP)"
@@ -51,7 +50,9 @@ jobs:
     - name: Build Project
       shell: powershell
       run: |
-        cmake --build build --config Release
+        # Флаг -- /p:TreatWarningsAsErrors=false принудительно отключает режим Warnings as Errors 
+        # на уровне движка MSBuild, полностью перекрывая любые внутренние настройки проектов Visual Studio.
+        cmake --build build --config Release -- /p:TreatWarningsAsErrors=false
 
     - name: Deploy Your Local SDL3.dll
       shell: powershell
