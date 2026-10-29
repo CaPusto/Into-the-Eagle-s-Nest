@@ -18,7 +18,7 @@ jobs:
 
     - name: Download SDL3 Development Pack
       run: |
-        curl -L -o sdl3_devel.zip 'https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-devel-3.4.18-VC.zip'
+        curl -Lf -o sdl3_devel.zip 'https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-devel-3.4.18-VC.zip'
 
     - name: Extract SDL3 Development Pack
       shell: powershell
@@ -28,27 +28,24 @@ jobs:
     - name: Configure CMake
       shell: powershell
       run: |
-        # 1. Комментируем вызовы pkg-config
+        # 1. Отключаем вызовы pkg-config, которые ломают MSVC
         (Get-Content CMakeLists.txt) `
           -replace 'find_package\(PkgConfig REQUIRED\)', '# find_package(PkgConfig REQUIRED)' `
           -replace 'pkg_check_modules\(SDL3 REQUIRED sdl3\)', '# pkg_check_modules(SDL3 REQUIRED sdl3)' `
           | Set-Content CMakeLists.txt
 
-        # 2. На лету внедряем костыль для MSVC, перенаправляя переменную путей инклудов 
-        # на сгенерированную официальным CMake-модулем SDL3
-        (Get-Content CMakeLists.txt) `
-          -replace 'include_directories\(\$\{SDL3_INCLUDE_DIRS\}\)', 'include_directories(${SDL3_INCLUDE_DIR})' `
-          | Set-Content CMakeLists.txt
-
-        # 3. Решаем проблему "initializer is not a constant": 
-        # заставляем MSVC компилировать embedded_assets.c как C++ файл с помощью свойства компилятора
+        # 2. Исправляем проблему неконстантных инициализаторов в embedded_assets.c (ошибка C2099)
         Add-Content CMakeLists.txt "`nset_source_files_properties(src/assets/embedded_assets.c PROPERTIES COMPILE_FLAGS /TP)"
 
-        # Запускаем конфигурацию, явно передавая правильный путь к cmake-модулю скачанного официального VC SDK
+        # 3. Передаем пути к инклудам и .lib файлу официального SDK напрямую через переменные окружения CMake.
+        # Флаг CMAKE_CXX_FLAGS / CMAKE_C_FLAGS со значением /I принудительно заставит MSVC видеть заголовочные файлы SDL3,
+        # а CMAKE_EXE_LINKER_FLAGS свяжет исполняемые файлы с библиотекой импорта.
         cmake -B build -S . `
           -DCMAKE_BUILD_TYPE=Release `
-          -DSDL3_DIR="C:/SDL3/SDL3-devel-3.4.18-VC/SDL3-3.4.18/cmake" `
-          -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON `
+          -DCMAKE_C_FLAGS="/I C:/SDL3/SDL3-devel-3.4.18-VC/SDL3-3.4.18/include" `
+          -DCMAKE_CXX_FLAGS="/I C:/SDL3/SDL3-devel-3.4.18-VC/SDL3-3.4.18/include" `
+          -DCMAKE_EXE_LINKER_FLAGS="C:/SDL3/SDL3-devel-3.4.18-VC/SDL3-3.4.18/lib/x64/SDL3.lib"
 
     - name: Build Project
       shell: powershell
