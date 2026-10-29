@@ -1,138 +1,100 @@
-name: Build and Release
+name: Create Release Artifacts
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*' # Запуск при пуше тегов, например v1.0.0, v2.1-alpha
 
 permissions:
-  contents: write
+  contents: write # Разрешение на создание релизов и загрузку артефактов
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
+  build-and-release:
+    name: Build and Upload Artifacts
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: eaglenest-linux
-            asset_path: build/dist
-          - os: windows-latest
-            artifact_name: eaglenest-windows
-            asset_path: build/dist
+            artifact_name: eaglenest-linux-x64
+            script: ./build_linux.sh
           - os: macos-latest
-            artifact_name: eaglenest-macos
-            asset_path: build/dist
+            artifact_name: eaglenest-macos-universal
+            script: ./build_macos.sh --universal
+          - os: windows-latest
+            artifact_name: eaglenest-windows-x64
+            script: msvc # Маркер для кастомного шага MSVC
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      # --- LINUX DEPENDENCIES ---
-      - name: Install Linux Build Tools
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build pkg-config libasound2-dev libpulse-dev
+    # --- ШАГ СБОРКИ ДЛЯ LINUX ---
+    - name: Install Linux Dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake pkg-config gcc libsdl3-dev
 
-      # --- MACOS DEPENDENCIES ---
-      - name: Install macOS Build Tools
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install cmake ninja
+    - name: Build Linux Project
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        chmod +x ${{ matrix.script }}
+        ${{ matrix.script }}
 
-      # --- SETUP SDL3 FOR UNIX (Linux/macOS) ---
-      - name: Setup SDL3 (Unix)
-        if: matrix.os != 'windows-latest'
-        uses: libsdl-org/setup-sdl@v1
-        with:
-          version: 3-latest
+    # --- ШАГ СБОРКИ ДЛЯ MACOS ---
+    - name: Install macOS Dependencies
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install cmake pkg-config sdl3
 
-      # --- WINDOWS SETUP (Using 7-Zip for rock-solid extraction) ---
-      - name: Prepare Windows SDL3 Directory
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          $url = "https://github.com/libsdl-org/SDL"
-          curl.exe -L -o sdl3_devel.zip $url
-          # Use 7z to extract securely and bypass tar/powershell path limitations
-          7z x sdl3_devel.zip
-          $extractedDir = Get-ChildItem -Directory -Filter "SDL3-*" | Select-Object -First 1
-          echo "SDL3_DIR=$($extractedDir.FullName)/lib/x64/cmake/SDL3" >> $env:GITHUB_ENV
+    - name: Build macOS Project
+      if: matrix.os == 'macos-latest'
+      run: |
+        chmod +x ${{ matrix.script }}
+        ${{ matrix.script }}
 
-      # --- COMPILATION ---
-      
-      # Standard Unix compilation (Linux/macOS)
-      - name: Configure and Build (Unix)
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja -DCMAKE_C_FLAGS="-Wno-error=unused-result -Wno-unused-result"
-          cmake --build .
+    # --- ШАГ СБОРКИ ДЛЯ WINDOWS (MSVC) ---
+    - name: Configure CMake (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: powershell
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ github.workspace }}/libs"
 
-      # Windows compilation using MSVC pointing to the verified temporary devel config
-      - name: Configure and Build (Windows MSVC)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DSDL3_DIR="${{ env.SDL3_DIR }}"
-          cmake --build . --config Release
-          
-          # Create target dist folder if CMake didn't create it during configuration
-          if (-not (Test-Path "dist")) { mkdir "dist" }
-          
-          # Copy your custom, production-ready SDL3.dll from the repository libs/ directory
-          if (Test-Path "../libs/SDL3.dll") {
-            Copy-Item "../libs/SDL3.dll" -Destination "dist/"
-          }
+    - name: Build Project (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: powershell
+      run: |
+        cmake --build build --config Release
 
-      # --- PACKAGING ---
-      - name: Create Archive (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          cd ${{ matrix.asset_path }}
-          tar -czf ../../${{ matrix.artifact_name }}.tar.gz .
+    - name: Prepare Windows Dist Folder
+      if: matrix.os == 'windows-latest'
+      shell: powershell
+      run: |
+        # Копируем локальную скомпилированную DLL из папки libs в dist рядом с .exe
+        Copy-Item -Path "libs/SDL3.dll" -Destination "build/dist/" -Force
 
-      - name: Create Archive (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          Set-Location ${{ matrix.asset_path }}
-          Compress-Archive -Path * -DestinationPath ../../${{ matrix.artifact_name }}.zip
+    # --- УПАКОВКА АРТЕФАКТОВ ПОД КАЖДУЮ ОС ---
+    - name: Package Release Directory (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        # Переходим в директорию сборки, где лежит папка dist с бинарниками и ассетами
+        cd build
+        zip -r ../${{ matrix.artifact_name }}.zip dist/
 
-      # Temporarily store the created archives
-      - name: Upload Artifact Storage
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: |
-            *.tar.gz
-            *.zip
-          retention-days: 1
+    - name: Package Release Directory (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: powershell
+      run: |
+        # Архивируем папку dist средствами PowerShell для Windows
+        cd build
+        Expand-Archive -Path "dist" -DestinationPath "../" # или Compress-Archive
+        Compress-Archive -Path "dist" -DestinationPath "../${{ matrix.artifact_name }}.zip" -Force
 
-  release:
-    name: Create GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Display downloaded files
-        run: ls -R artifacts
-
-      - name: Create Release and Upload Assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            artifacts/*.tar.gz
-            artifacts/*.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # --- ЗАГРУЗКА В РЕЛИЗ GITHUB ---
+    - name: Upload Binaries to Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ${{ matrix.artifact_name }}.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
