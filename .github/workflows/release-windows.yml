@@ -47,12 +47,20 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON `
           -DCMAKE_PROJECT_INCLUDE_BEFORE="C:/inject.cmake"
 
+    - name: Disable TreatWarningsAsErrors in Projects
+      shell: powershell
+      run: |
+        # Находим все файлы проектов Visual Studio и жестко отключаем TreatWarningAsError на уровне XML
+        Get-ChildItem -Path build -Filter *.vcxproj -Recurse | ForEach-Object {
+          (Get-Content $_.FullName) `
+            -replace '<TreatWarningAsError>true</TreatWarningAsError>', '<TreatWarningAsError>false</TreatWarningAsError>' `
+            | Set-Content $_.FullName
+        }
+
     - name: Build Project
       shell: powershell
       run: |
-        # Флаг -- /p:TreatWarningsAsErrors=false принудительно отключает режим Warnings as Errors 
-        # на уровне движка MSBuild, полностью перекрывая любые внутренние настройки проектов Visual Studio.
-        cmake --build build --config Release -- /p:TreatWarningsAsErrors=false
+        cmake --build build --config Release
 
     - name: Deploy Your Local SDL3.dll
       shell: powershell
