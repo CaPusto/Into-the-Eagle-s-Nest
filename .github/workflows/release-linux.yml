@@ -1,1 +1,48 @@
+name: Release Linux
 
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: Build Linux x64
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Linux Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake pkg-config gcc libasound2-dev libpulse-dev
+
+    - name: Build and Install SDL3 from Source
+      run: |
+        git clone 'https://github.com' --depth=1 -b main
+        cd SDL
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        sudo cmake --build . --target install
+        sudo ldconfig
+
+    - name: Build Linux Project
+      run: |
+        chmod +x build_linux.sh
+        ./build_linux.sh
+
+    - name: Package Release Directory
+      run: |
+        cd build
+        zip -r ../eaglenest-linux-x64.zip dist/
+
+    - name: Upload Binary to Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: eaglenest-linux-x64.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
