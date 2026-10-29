@@ -29,13 +29,22 @@ jobs:
     - name: Configure CMake for Project
       shell: powershell
       run: |
+        # 1. Отключаем вызовы pkg-config, которые ломают MSVC
         (Get-Content CMakeLists.txt) `
           -replace 'find_package\(PkgConfig REQUIRED\)', '# find_package(PkgConfig REQUIRED)' `
           -replace 'pkg_check_modules\(SDL3 REQUIRED sdl3\)', '# pkg_check_modules(SDL3 REQUIRED sdl3)' `
           | Set-Content CMakeLists.txt
 
+        # 2. Вырезаем линковку Unix-библиотеки математики 'm', так как в MSVC она встроенная
+        (Get-Content CMakeLists.txt) `
+          -replace 'target_link_libraries\(eaglenest \$\{SDL3_LIBRARIES\} m\)', 'target_link_libraries(eaglenest ${SDL3_LIBRARIES})' `
+          -replace 'target_link_libraries\(mapview \$\{SDL3_LIBRARIES\} m\)', 'target_link_libraries(mapview ${SDL3_LIBRARIES})' `
+          | Set-Content CMakeLists.txt
+
+        # 3. Переводим embedded_assets.c в режим C++ (решает ошибку C2099 неконстантной инициализации)
         Add-Content CMakeLists.txt "`nset_source_files_properties(src/assets/embedded_assets.c PROPERTIES COMPILE_FLAGS /TP)"
 
+        # 4. Создаем инъекцию путей для сборщика
         @"
         include_directories("C:/SDL3_Built/include")
         link_libraries("C:/SDL3_Built/lib/SDL3.lib")
@@ -50,7 +59,6 @@ jobs:
     - name: Disable TreatWarningsAsErrors in Projects
       shell: powershell
       run: |
-        # Находим все файлы проектов Visual Studio и жестко отключаем TreatWarningAsError на уровне XML
         Get-ChildItem -Path build -Filter *.vcxproj -Recurse | ForEach-Object {
           (Get-Content $_.FullName) `
             -replace '<TreatWarningAsError>true</TreatWarningAsError>', '<TreatWarningAsError>false</TreatWarningAsError>' `
