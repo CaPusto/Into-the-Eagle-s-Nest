@@ -23,7 +23,6 @@ jobs:
     - name: Build and Install SDL3 from Source (Windows)
       shell: powershell
       run: |
-        # Компилируем официальный SDL3 нативной сборкой MSVC в папку C:\SDL3_Built
         cmake -B SDL/build -S SDL -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=ON -DSDL_STATIC=OFF -DCMAKE_INSTALL_PREFIX="C:/SDL3_Built"
         cmake --build SDL/build --config Release --target install
 
@@ -39,21 +38,21 @@ jobs:
         # 2. Исправляем проблему неконстантных инициализаторов в embedded_assets.c (ошибка C2099)
         Add-Content CMakeLists.txt "`nset_source_files_properties(src/assets/embedded_assets.c PROPERTIES COMPILE_FLAGS /TP)"
 
-        # 3. Конфигурируем вашу игру, указывая CMake на только что собранный нами бэкенд SDL3
-        cmake -B build -S . `
-          -DCMAKE_BUILD_TYPE=Release `
-          -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON `
-          -DSDL3_DIR="C:/SDL3_Built/share/cmake/SDL3"
+        # 3. Конфигурируем вашу игру
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON
 
     - name: Build Project
       shell: powershell
+      # Прокидываем пути к заголовочным файлам и .lib напрямую через стандартные переменные окружения MSVC
+      env:
+        INCLUDE: "C:\SDL3_Built\include"
+        LIB: "C:\SDL3_Built\lib"
       run: |
         cmake --build build --config Release
 
     - name: Deploy Your Local SDL3.dll
       shell: powershell
       run: |
-        # Принудительно заменяем DLL в папке результатов вашей скомпилированной библиотекой
         Copy-Item -Path "libs/SDL3.dll" -Destination "build/dist/" -Force
 
     - name: Package Release Directory
