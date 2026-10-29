@@ -29,24 +29,23 @@ jobs:
     - name: Configure CMake for Project
       shell: powershell
       run: |
-        
         (Get-Content CMakeLists.txt) `
           -replace 'find_package\(PkgConfig REQUIRED\)', '# find_package(PkgConfig REQUIRED)' `
           -replace 'pkg_check_modules\(SDL3 REQUIRED sdl3\)', '# pkg_check_modules(SDL3 REQUIRED sdl3)' `
           | Set-Content CMakeLists.txt
 
-        
-        (Get-Content CMakeLists.txt) `
-          -replace 'include_directories\(\$\{SDL3_INCLUDE_DIRS\}\)', 'include_directories("C:/SDL3_Built/include")' `
-          | Set-Content CMakeLists.txt
-
-        (Get-Content CMakeLists.txt) `
-          -replace '\$\{SDL3_LIBRARIES\}', '"C:/SDL3_Built/lib/SDL3.lib"' `
-          | Set-Content CMakeLists.txt
-
         Add-Content CMakeLists.txt "`nset_source_files_properties(src/assets/embedded_assets.c PROPERTIES COMPILE_FLAGS /TP)"
 
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON
+        @"
+        include_directories("C:/SDL3_Built/include")
+        link_libraries("C:/SDL3_Built/lib/SDL3.lib")
+        set(SDL3_LIBRARIES "C:/SDL3_Built/lib/SDL3.lib" CACHE INTERNAL "")
+        "@ | Set-Content "C:/inject.cmake"
+
+        cmake -B build -S . `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON `
+          -DCMAKE_PROJECT_INCLUDE_BEFORE="C:/inject.cmake"
 
     - name: Build Project
       shell: powershell
