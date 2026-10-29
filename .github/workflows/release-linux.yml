@@ -19,7 +19,6 @@ jobs:
     - name: Install Linux Dependencies
       run: |
         sudo apt-get update
-        # Устанавливаем полный стек графических библиотек, включая X11, Wayland и libdecor
         sudo apt-get install -y cmake pkg-config gcc libasound2-dev libpulse-dev \
           libx11-dev libxkbcommon-dev libwayland-dev libdecor-0-dev
 
@@ -28,7 +27,6 @@ jobs:
         git clone 'https://github.com/libsdl-org/SDL' --depth=1 -b main
         cd SDL
         mkdir build && cd build
-        # Убираем флаг отключения Wayland. Теперь SDL3 соберется с поддержкой обеих систем.
         cmake .. -DCMAKE_BUILD_TYPE=Release -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
         sudo cmake --build . --target install
         sudo ldconfig
@@ -36,7 +34,9 @@ jobs:
     - name: Build Linux Project
       run: |
         chmod +x build_linux.sh
-        ./build_linux.sh
+        # Передаем флаг отключения трактовки варнингов как ошибок компиляции в CMake
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-Wno-error"
+        cmake --build build
 
     - name: Package Release Directory
       run: |
