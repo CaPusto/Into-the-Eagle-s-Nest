@@ -41,19 +41,23 @@ jobs:
           -replace 'target_link_libraries\(mapview \$\{SDL3_LIBRARIES\} m\)', 'target_link_libraries(mapview ${SDL3_LIBRARIES})' `
           | Set-Content CMakeLists.txt
 
-        # 3. Create include and link paths injection + GLOBAL C++ flag compilation for all targets
-        # This completely avoids C2099 on embedded_assets.c and resolves name mangling entirely.
+        # 3. Patch tools/convert_assets.c to generate standard C arrays that MSVC accepts natively.
+        # This completely fixes C2099 without any compiler flags.
+        (Get-Content tools/convert_assets.c) `
+          -replace '\.data = asset_%d_data', '.data = (const u8[])' `
+          | Set-Content tools/convert_assets.c
+
+        # 4. Inject target link options to prevent WinMain errors
+        Add-Content CMakeLists.txt "`nif(MSVC)"
+        Add-Content CMakeLists.txt "`n  target_link_options(eaglenest PRIVATE /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE)"
+        Add-Content CMakeLists.txt "`n  target_link_options(mapview PRIVATE /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE)"
+        Add-Content CMakeLists.txt "`nendif()"
+
+        # 5. Create include and link paths injection
         @"
         include_directories("C:/SDL3_Built/include")
         link_libraries("C:/SDL3_Built/lib/SDL3.lib")
         set(SDL3_LIBRARIES "C:/SDL3_Built/lib/SDL3.lib" CACHE INTERNAL "")
-        
-        if(MSVC)
-          # Force CMake to treat all C files as C++ globally to allow non-constant structure initializers
-          set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /TP")
-          set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /TP")
-          set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE")
-        endif()
         "@ | Set-Content "C:/inject.cmake"
 
         cmake -B build -S . `
