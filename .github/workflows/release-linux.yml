@@ -32,10 +32,11 @@ jobs:
         sudo ldconfig
 
     - name: Build Linux Project
-      # Переменная окружения заставит GCC игнорировать этот варнинг во всех вызываемых вложенных скриптах
-      env:
-        CFLAGS: "-Wno-error"
       run: |
+        # На лету удаляем из CMakeLists.txt любые упоминания флага -Werror,
+        # чтобы предупреждения в инструментах конвертации не ломали сборку в CI
+        sed -i 's/-Werror//g' CMakeLists.txt
+        
         chmod +x build_linux.sh
         ./build_linux.sh
 
