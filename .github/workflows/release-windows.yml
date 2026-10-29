@@ -1,0 +1,50 @@
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows x64 (MSVC)
+    runs-on: windows-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download SDL3 Development Pack
+      run: |
+        curl -L -o SDL3-devel-3.4.18-VC.zip 'https://github.com/libsdl-org/SDL/releases/download/release-3.4.18'
+
+    - name: Extract SDL3 Development Pack
+      shell: powershell
+      run: Expand-Archive -Path "SDL3-devel-3.4.18-VC.zip" -DestinationPath "C:\SDL3"
+
+    - name: Configure CMake
+      shell: powershell
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DSDL3_DIR="C:/SDL3/SDL3-devel-3.4.18-VC/SDL3-3.4.18/cmake" -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON
+
+    - name: Build Project
+      shell: powershell
+      run: cmake --build build --config Release
+
+    - name: Prepare Windows Dist Folder
+      shell: powershell
+      run: Copy-Item -Path "libs/SDL3.dll" -Destination "build/dist/" -Force
+
+    - name: Package Release Directory
+      shell: powershell
+      run: |
+        cd build
+        Compress-Archive -Path "dist" -DestinationPath "../eaglenest-windows-x64.zip" -Force
+
+    - name: Upload Binary to Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: eaglenest-windows-x64.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
