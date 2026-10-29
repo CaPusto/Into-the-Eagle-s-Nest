@@ -41,8 +41,8 @@ jobs:
     - name: Build Project
       shell: powershell
       env:
-        INCLUDE: "C:\SDL3_Built\include"
-        LIB: "C:\SDL3_Built\lib"
+        INCLUDE: 'C:\SDL3_Built\include'
+        LIB: 'C:\SDL3_Built\lib'
       run: |
         cmake --build build --config Release
 
