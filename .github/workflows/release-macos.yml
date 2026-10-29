@@ -25,10 +25,40 @@ jobs:
         chmod +x build_macos.sh
         ./build_macos.sh
 
-    - name: Package Release Directory
+    - name: Create and Package App Bundle
       run: |
-        cd build
-        zip -r ../eaglenest-macos-x64.zip dist/
+        mkdir -p IntoTheEaglesNest.app/Contents/MacOS
+        mkdir -p IntoTheEaglesNest.app/Contents/Resources
+        
+        cp build/dist/eaglenest IntoTheEaglesNest.app/Contents/MacOS/
+        cp build/dist/mapview IntoTheEaglesNest.app/Contents/MacOS/
+        
+        cp -r build/dist/assets IntoTheEaglesNest.app/Contents/Resources/
+        
+        cat <<EOF > IntoTheEaglesNest.app/Contents/Info.plist
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>eaglenest</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.capusto.intotheeaglesnest</string>
+            <key>CFBundleName</key>
+            <string>Into the Eagle's Nest</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.13</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+        </dict>
+        </plist>
+        EOF
+        
+        zip -r ../eaglenest-macos-x64.zip IntoTheEaglesNest.app/
 
     - name: Upload Binary to Release
       uses: softprops/action-gh-release@v2
