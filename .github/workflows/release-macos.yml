@@ -33,6 +33,10 @@ jobs:
         cp build/dist/eaglenest IntoTheEaglesNest.app/Contents/MacOS/
         cp build/dist/mapview IntoTheEaglesNest.app/Contents/MacOS/
         
+        # Explicitly grant executable permissions to the binaries before packaging
+        chmod +x IntoTheEaglesNest.app/Contents/MacOS/eaglenest
+        chmod +x IntoTheEaglesNest.app/Contents/MacOS/mapview
+        
         cp -r assets IntoTheEaglesNest.app/Contents/Resources/
         
         cat <<EOF > IntoTheEaglesNest.app/Contents/Info.plist
@@ -58,12 +62,16 @@ jobs:
         </plist>
         EOF
         
-        # Fixed: Removed "../" to save the zip archive directly in the repository root directory
-        zip -r eaglenest-macos-x64.zip IntoTheEaglesNest.app/
+        # Create a temporary directory to build the disk image cleanly
+        mkdir dmg_root
+        mv IntoTheEaglesNest.app dmg_root/
+        
+        # Build a native macOS DMG disk image instead of a broken ZIP file
+        hdiutil create -volname "Into the Eagles Nest" -srcfolder dmg_root -ov -format UDZO eaglenest-macos.dmg
 
     - name: Upload Binary to Release
       uses: softprops/action-gh-release@v2
       with:
-        files: eaglenest-macos-x64.zip
+        files: eaglenest-macos.dmg
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
