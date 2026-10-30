@@ -18,6 +18,7 @@ A cross-platform port of the original Amiga game *Eagle's Nest* to C using [SDL3
   </tr>
   <tr>
     <td><img src="docs/game-03.png" alt="Game 03" width="400"></td>
+    <td><img src="docs/game-04.png" alt="Game 04" width="400"></td>
     <td></td>
   </tr>
 </table>
