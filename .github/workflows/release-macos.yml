@@ -30,15 +30,21 @@ jobs:
         mkdir -p IntoTheEaglesNest.app/Contents/MacOS
         mkdir -p IntoTheEaglesNest.app/Contents/Resources
         
+        # Copy compiled binaries
         cp build/dist/eaglenest IntoTheEaglesNest.app/Contents/MacOS/
         cp build/dist/mapview IntoTheEaglesNest.app/Contents/MacOS/
         
-        # Explicitly grant executable permissions to the binaries before packaging
+        # Ensure executable permissions are preserved
         chmod +x IntoTheEaglesNest.app/Contents/MacOS/eaglenest
         chmod +x IntoTheEaglesNest.app/Contents/MacOS/mapview
         
+        # Copy assets
         cp -r assets IntoTheEaglesNest.app/Contents/Resources/
         
+        # Copy your ready-made Apple Icon directly to Resources
+        cp src/resources/appicon.icns IntoTheEaglesNest.app/Contents/Resources/
+        
+        # Generate clean Info.plist pointing to the icon
         cat <<EOF > IntoTheEaglesNest.app/Contents/Info.plist
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
@@ -46,6 +52,8 @@ jobs:
         <dict>
             <key>CFBundleExecutable</key>
             <string>eaglenest</string>
+            <key>CFBundleIconFile</key>
+            <string>appicon.icns</string>
             <key>CFBundleIdentifier</key>
             <string>com.capusto.intotheeaglesnest</string>
             <key>CFBundleName</key>
@@ -62,11 +70,9 @@ jobs:
         </plist>
         EOF
         
-        # Create a temporary directory to build the disk image cleanly
+        # Package into DMG
         mkdir dmg_root
         mv IntoTheEaglesNest.app dmg_root/
-        
-        # Build a native macOS DMG disk image instead of a broken ZIP file
         hdiutil create -volname "Into the Eagles Nest" -srcfolder dmg_root -ov -format UDZO eaglenest-macos.dmg
 
     - name: Upload Binary to Release
